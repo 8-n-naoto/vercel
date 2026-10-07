@@ -28,6 +28,8 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+# 性能測定の生データ（k6 の JSON、curl の CSV。tests/perf/README.md）
+tests/perf/results/
 
 # ===== 巨大な試験用 HTML（npm run gen:probe で生成。50MB 級のためコミットしない） =====
 /e2e/assets/large-*.html
