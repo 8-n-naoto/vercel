@@ -112,7 +112,10 @@ export function defineAction<I, O>(def: ActionDef<I, O>) {
       for (const rule of rules) {
         const key = rule.key(ctx, parsed.data)
         if (key === null) continue
-        const r = await consumeRateLimit({ name: rule.name, key, limit: rule.limit, windowSec: rule.windowSec }, ctx)
+        const r = await consumeRateLimit(
+          { name: rule.name, key, limit: rule.limit, windowSec: rule.windowSec, ...(rule.auditAction ? { auditAction: rule.auditAction } : {}) },
+          ctx,
+        )
         if (!r.ok) throw appError('RATE_LIMITED', 'common.rate_limited', { retryAfterSec: r.retryAfterSec })
       }
 

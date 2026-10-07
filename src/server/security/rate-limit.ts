@@ -1,7 +1,10 @@
-// Phase 0 stub of consumeRateLimit (WP-1.4, 06 3.5, 07 5) plus the pure helpers of 07 5.1.
+// Rate limiting (06 3.5, 07 5): pure helpers of 07 5.1 plus consumeRateLimit (UPSERT, fail-closed).
 import 'server-only'
 import { createHash } from 'node:crypto'
+import { appError } from '@/lib/errors'
 import type { ServiceContext } from '@/server/actions/define-action'
+import { recordStandalone } from '@/server/services/audit'
+import { incrementRateLimit } from '@/server/services/rate-limit-store'
 
 export type RateLimitRuleName =
   | 'login:email'
@@ -50,11 +53,36 @@ export function rateLimitKey(rule: RateLimitRuleName, parts: RateLimitParts): st
   }
 }
 
-export async function consumeRateLimit(
-  rule: { name: string; key: string; limit: number; windowSec: number },
-  ctx: ServiceContext,
-): Promise<{ ok: true } | { ok: false; retryAfterSec: number }> {
-  void rule
-  void ctx
-  return { ok: true } // no-op until app.rate_limits exists
+export interface ConsumeRule {
+  name: string
+  key: string
+  limit: number
+  windowSec: number
+  /** Audit action written on the first excess (default 'security.rate_limited'). */
+  auditAction?: 'auth.login_rate_limited'
+}
+
+/**
+ * 06 3.5: one UPSERT (07 5.1), committed immediately regardless of the business outcome. Fail-closed: any DB error rejects with INTERNAL.
+ * The first excess (count === limit + 1) writes one audit row with { rule: name }; the key itself is never recorded.
+ */
+export async function consumeRateLimit(rule: ConsumeRule, ctx: ServiceContext): Promise<{ ok: true } | { ok: false; retryAfterSec: number }> {
+  let hit: { count: number; retryAfter: number }
+  try {
+    hit = await incrementRateLimit(rule.key, rule.windowSec)
+  } catch (e) {
+    console.error(JSON.stringify({ event: 'rate_limit.db_error', rule: rule.name, requestId: ctx.requestMeta.requestId, error: e instanceof Error ? e.name : 'unknown' }))
+    throw appError('INTERNAL', 'common.internal', { requestId: ctx.requestMeta.requestId, params: { requestId: ctx.requestMeta.requestId } })
+  }
+  const d = decideRateLimit(hit.count, rule.limit, hit.retryAfter)
+  if (d.ok) return { ok: true }
+  if (d.writeAudit) {
+    try {
+      await recordStandalone(ctx, { action: rule.auditAction ?? 'security.rate_limited', metadata: { rule: rule.name } })
+    } catch (e) {
+      // The request is rejected either way; a failed audit row must not turn RATE_LIMITED into INTERNAL.
+      console.error(JSON.stringify({ event: 'rate_limit.audit_failed', rule: rule.name, requestId: ctx.requestMeta.requestId, error: e instanceof Error ? e.name : 'unknown' }))
+    }
+  }
+  return { ok: false, retryAfterSec: d.retryAfterSec }
 }
