@@ -1,5 +1,5 @@
-// S10 (08 5.10). Without an admin session the page redirects to /login (WP-1.3). S10-1 .. S10-4 need the real Actions (WP-2.3) and
-// an admin session on a DB, so they are skipped until then.
+// S10 (08 5.10). Without an admin session the page redirects to /login (WP-1.3). S10-1 .. S10-4 need an admin session on a DB and live in
+// e2e/phase2-flow.spec.ts (skipped unless E2E_DB=1 and SEED_PASSWORD are set).
 import { expect, test } from '@playwright/test'
 
 test('S10: no session -> /login with next=/admin/invites', async ({ page }) => {
@@ -7,7 +7,3 @@ test('S10: no session -> /login with next=/admin/invites', async ({ page }) => {
   await expect(page).toHaveURL(/\/login\?next=/)
   expect(decodeURIComponent(new URL(page.url()).searchParams.get('next') ?? '')).toContain('/admin/invites')
 })
-
-for (const id of ['S10-1', 'S10-2', 'S10-3', 'S10-4']) {
-  test.skip(`${id}: needs adminCreateInvite / adminRevokeInvite (WP-2.3) and an admin session`, () => undefined)
-}

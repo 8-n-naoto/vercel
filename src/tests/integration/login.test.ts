@@ -9,6 +9,7 @@ import type { ServiceContext } from '@/server/actions/define-action'
 import { closeDb, pingDb } from '@/server/db/client'
 import { signIn, signOut } from '@/server/services/auth'
 import { cleanupTestUsers, countAudit, createTestUser, deleteProfile, disableUser, findLastLoginAt, jar } from './helpers/auth-fixture'
+import { purgeAuditOfTestUsers } from './helpers/phase2-fixture'
 
 const dbUp = await pingDb().then(
   () => true,
@@ -16,7 +17,10 @@ const dbUp = await pingDb().then(
 )
 
 afterAll(async () => {
-  if (dbUp) await cleanupTestUsers()
+  if (dbUp) {
+    await purgeAuditOfTestUsers() // audit_logs.actor_id is RESTRICT: remove the rows of the test users first
+    await cleanupTestUsers()
+  }
   await closeDb()
 })
 beforeEach(() => jar.cookies.clear())

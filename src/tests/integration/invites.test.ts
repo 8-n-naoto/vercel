@@ -14,6 +14,7 @@ import { adminService } from '@/server/services/admin'
 import { accept, completePasswordReset, invitesService } from '@/server/services/invites'
 import { cleanupTestUsers, createTestUser, jar, type TestUser } from './helpers/auth-fixture'
 import { cleanupInvitees, cleanupInvitesOf } from './helpers/invite-fixture'
+import { purgeAuditOfTestUsers } from './helpers/phase2-fixture'
 
 const dbUp = await pingDb().then(
   () => true,
@@ -32,6 +33,7 @@ afterAll(async () => {
   if (dbUp) {
     await cleanupInvitees(inviteeEmails)
     await cleanupInvitesOf(testUserIds)
+    await purgeAuditOfTestUsers() // audit_logs.actor_id is RESTRICT: remove the rows of the test users first
     await cleanupTestUsers()
   }
   await closeDb()

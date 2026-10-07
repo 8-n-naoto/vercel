@@ -10,6 +10,7 @@ import { closeDb, pingDb } from '@/server/db/client'
 import { changePassword, getProfile, updateProfile } from '@/server/services/account'
 import { signIn } from '@/server/services/auth'
 import { cleanupTestUsers, createTestUser, jar, type TestUser } from './helpers/auth-fixture'
+import { purgeAuditOfTestUsers } from './helpers/phase2-fixture'
 
 const dbUp = await pingDb().then(
   () => true,
@@ -17,7 +18,10 @@ const dbUp = await pingDb().then(
 )
 
 afterAll(async () => {
-  if (dbUp) await cleanupTestUsers()
+  if (dbUp) {
+    await purgeAuditOfTestUsers() // audit_logs.actor_id is RESTRICT: remove the rows of the test users first
+    await cleanupTestUsers()
+  }
   await closeDb()
 })
 beforeEach(() => jar.cookies.clear())
