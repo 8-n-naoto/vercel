@@ -1,13 +1,15 @@
-// File RSC reads (06 9.4). Only listInFolder exists so far; the other file reads arrive with WP-4.x.
+// File RSC reads (06 9.4 listInFolder, 9.8 getUploadContext, 9.9 getDetail).
 import 'server-only'
 import { fileDisplayState } from '@/lib/display-state'
 import type { FileDetail, FileDetailResult, FileList, UploadContext } from '@/lib/dto'
 import { appError } from '@/lib/errors'
 import { zUuid } from '@/lib/schemas/common'
 import type { ServiceContext } from '@/server/actions/define-action'
-import { assertFolderRole } from '@/server/authz/folder'
+import { assertFileRole, assertFolderRole } from '@/server/authz/folder'
+import { getConfig } from '@/server/config'
 import { getDb } from '@/server/db/client'
-import { listActiveFilesForAdmin, listPublicFilesForMember, type FileRow } from '@/server/repositories/files'
+import { listActiveFilesForAdmin, listPublicFilesForMember, sumQuotaUsage, type FileRow } from '@/server/repositories/files'
+import { findDisplayName } from '@/server/repositories/profiles'
 
 export const FILE_SORTS = ['updated_desc', 'name_asc', 'size_desc'] as const
 export type FileSort = (typeof FILE_SORTS)[number]
@@ -91,14 +93,77 @@ export function toFileDetail(file: FileRow, folderName: string, uploader: { id: 
   }
 }
 
-/** STUB: WP-4.2 replaces. 06 9.8 files.getUploadContext. */
-const getUploadContext: (ctx: ServiceContext, folderId: string) => Promise<UploadContext> = async () => {
-  throw appError('NOT_FOUND', 'common.not_found')
+const MB = 1_048_576
+
+export interface UploadContextDeps {
+  /** assertFolderRole(manage) + one usage statement (07 6). */
+  load: (ctx: ServiceContext, folderId: string) => Promise<{ folder: { id: string; name: string }; userUsed: number; totalUsed: number }>
+  limits: () => { maxFileBytes: number; userLimitBytes: number; totalLimitBytes: number }
 }
 
-/** STUB: WP-4.2 replaces. 06 9.9 files.getDetail. */
-const getDetail: (ctx: ServiceContext, fileId: string) => Promise<FileDetailResult> = async () => {
-  throw appError('NOT_FOUND', 'common.not_found')
+export const defaultUploadContextDeps: UploadContextDeps = {
+  load: (ctx, folderId) =>
+    getDb().transaction(async (tx) => {
+      if (!ctx.actor) throw appError('UNAUTHENTICATED', 'common.unauthenticated')
+      const { folder } = await assertFolderRole(ctx, tx, folderId, 'manage')
+      const usage = await sumQuotaUsage(tx, ctx.actor.userId)
+      return { folder: { id: folder.id, name: folder.name }, ...usage }
+    }),
+  limits: () => {
+    const c = getConfig()
+    return { maxFileBytes: c.MAX_FILE_SIZE_MB * MB, userLimitBytes: c.USER_QUOTA_MB * MB, totalLimitBytes: c.TOTAL_QUOTA_MB * MB }
+  },
+}
+
+/** 06 9.8. Admin only (a member is FORBIDDEN, a non-member NOT_FOUND via assertFolderRole). */
+async function getUploadContext(ctx: ServiceContext, folderId: string, deps: UploadContextDeps = defaultUploadContextDeps): Promise<UploadContext> {
+  if (!zUuid.safeParse(folderId).success) throw appError('NOT_FOUND', 'common.not_found')
+  const r = await deps.load(ctx, folderId)
+  const l = deps.limits()
+  return {
+    folder: r.folder,
+    maxFileSizeBytes: l.maxFileBytes,
+    userQuota: { usedBytes: r.userUsed, limitBytes: l.userLimitBytes },
+    totalQuota: { usedBytes: r.totalUsed, limitBytes: l.totalLimitBytes },
+  }
+}
+
+export interface FileDetailDeps {
+  /** assertFileRole(view) (a deleted file is absent) + the uploader name for admins (null for members: no lookup). */
+  load: (ctx: ServiceContext, fileId: string) => Promise<{ access: 'admin' | 'member'; file: FileRow; folderName: string; uploaderName: string | null }>
+}
+
+export const defaultFileDetailDeps: FileDetailDeps = {
+  load: (ctx, fileId) =>
+    getDb().transaction(async (tx) => {
+      const r = await assertFileRole(ctx, tx, fileId, 'view')
+      const uploaderName = r.access === 'admin' ? ((await findDisplayName(tx, r.file.uploadedBy)) ?? '') : null
+      return { access: r.access, file: r.file, folderName: r.folder.name, uploaderName }
+    }),
+}
+
+/** 06 9.9. Admin: any active file. Member: public files only, anything else is NOT_FOUND (the state is not revealed). */
+async function getDetail(ctx: ServiceContext, fileId: string, deps: FileDetailDeps = defaultFileDetailDeps): Promise<FileDetailResult> {
+  if (!zUuid.safeParse(fileId).success) throw appError('NOT_FOUND', 'common.not_found')
+  const r = await deps.load(ctx, fileId)
+  const f = r.file
+  if (f.status !== 'active') throw appError('NOT_FOUND', 'common.not_found') // pending has no detail screen
+  if (r.access === 'admin') {
+    return { access: 'admin', file: toFileDetail(f, r.folderName, { id: f.uploadedBy, displayName: r.uploaderName ?? '' }, ctx.now) }
+  }
+  if (fileDisplayState(f, ctx.now) !== 'public') throw appError('NOT_FOUND', 'common.not_found')
+  return {
+    access: 'member',
+    file: {
+      id: f.id,
+      folderId: f.folderId,
+      folderName: r.folderName,
+      displayName: f.displayName,
+      sizeBytes: f.sizeBytes,
+      updatedAt: f.updatedAt.toISOString(),
+      downloadAllowed: f.downloadAllowed,
+    },
+  }
 }
 
 export const filesService = { listInFolder, getUploadContext, getDetail }

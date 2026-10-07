@@ -161,3 +161,34 @@ export async function activateFile(tx: Tx, id: string, v: { sizeBytes: number; c
     .returning()
   return rows[0]
 }
+
+/** 06 7.4: updates the changed text columns of an active file. Returns the updated row. */
+export async function updateFileText(
+  tx: Tx,
+  id: string,
+  v: { displayName?: string; charset?: FileRow['charset'] },
+): Promise<FileRow | undefined> {
+  const rows = await tx
+    .update(files)
+    .set({
+      ...(v.displayName !== undefined ? { displayName: v.displayName } : {}),
+      ...(v.charset !== undefined ? { charset: v.charset } : {}),
+    })
+    .where(and(eq(files.id, id), eq(files.status, 'active')))
+    .returning()
+  return rows[0]
+}
+
+/** 06 7.5: replaces the restriction columns of an active file (callers pass the full new set). Returns the updated row. */
+export async function updateFileRestrictions(
+  tx: Tx,
+  id: string,
+  v: { suspended: boolean; viewStartsAt: Date | null; viewEndsAt: Date | null; expiresAt: Date | null; downloadAllowed: boolean },
+): Promise<FileRow | undefined> {
+  const rows = await tx
+    .update(files)
+    .set(v)
+    .where(and(eq(files.id, id), eq(files.status, 'active')))
+    .returning()
+  return rows[0]
+}

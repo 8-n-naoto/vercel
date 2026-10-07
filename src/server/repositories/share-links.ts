@@ -46,3 +46,13 @@ export async function revokeLinksForDeletedFolder(tx: Tx, fileIds: string[], by:
 export function activeShareLinkSql(now: Date) {
   return and(isNull(shareLinks.revokedAt), gt(shareLinks.expiresAt, now), or(isNull(shareLinks.maxViews), lt(shareLinks.viewCount, shareLinks.maxViews)))
 }
+
+/** 06 7.6: revokes every open link of one deleted file; returns the number of revoked links. */
+export async function revokeLinksForDeletedFile(tx: Tx, fileId: string, by: string, at: Date): Promise<number> {
+  const rows = await tx
+    .update(shareLinks)
+    .set({ revokedAt: at, revokedBy: by, revokeReason: 'file_deleted' })
+    .where(and(eq(shareLinks.fileId, fileId), isNull(shareLinks.revokedAt)))
+    .returning({ id: shareLinks.id })
+  return rows.length
+}

@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { AppError } from '@/lib/errors'
 import type { ServiceContext } from '@/server/actions/define-action'
-import { filesService, parseFileSort, type AdminFileRow, type FileReadDeps } from './files'
+import type { MemberFileDetail } from '@/lib/dto'
+import type { FileRow } from '@/server/repositories/files'
+import { filesService, parseFileSort, type AdminFileRow, type FileDetailDeps, type FileReadDeps, type UploadContextDeps } from './files'
 
 vi.mock('@/server/db/client', () => ({ getDb: vi.fn() }))
 
@@ -81,5 +83,124 @@ describe('files.listInFolder (06 9.4)', () => {
     // @ts-expect-error the value is not a FileSort on purpose
     await filesService.listInFolder(ctx, FOLDER, 'bogus', d)
     expect(d.listMemberRows).toHaveBeenCalledWith(FOLDER, 'updated_desc', now)
+  })
+})
+
+const FILE = '00000000-0000-4000-8000-000000000020'
+const MB = 1_048_576
+const adminCtx: ServiceContext = { ...ctx, actor: { userId: 'a1', email: 'a1@example.com', displayName: 'A1', role: 'admin' } }
+
+function fileRow(over: Partial<FileRow> = {}): FileRow {
+  return {
+    id: FILE,
+    folderId: FOLDER,
+    uploadedBy: 'a1',
+    displayName: 'doc',
+    originalFilename: 'doc.html',
+    storagePath: `${FOLDER}/${FILE}.html`,
+    contentType: 'text/html',
+    charset: 'utf-8',
+    sizeBytes: 100,
+    status: 'active',
+    suspended: false,
+    viewStartsAt: null,
+    viewEndsAt: null,
+    expiresAt: null,
+    downloadAllowed: true,
+    uploadExpiresAt: null,
+    activatedAt: new Date('2026-10-01T00:00:00Z'),
+    deletedAt: null,
+    deletedBy: null,
+    deleteReason: null,
+    purgedAt: null,
+    createdAt: now,
+    updatedAt: new Date('2026-10-02T00:00:00Z'),
+    ...over,
+  }
+}
+const detailDeps = (access: 'admin' | 'member', file: FileRow): FileDetailDeps => ({
+  load: vi.fn(async () => ({ access, file, folderName: 'Docs', uploaderName: access === 'admin' ? 'Alice' : null })),
+})
+
+describe('files.getDetail (06 9.9)', () => {
+  it('admin: the full detail including the uploader and restrictions', async () => {
+    const r = await filesService.getDetail(adminCtx, FILE, detailDeps('admin', fileRow({ suspended: true })))
+    expect(r.access).toBe('admin')
+    if (r.access !== 'admin') return
+    expect(r.file).toMatchObject({ displayState: 'suspended', folderName: 'Docs', uploadedBy: { id: 'a1', displayName: 'Alice' }, charset: 'utf-8' })
+    expect(r.file.restrictions.suspended).toBe(true)
+  })
+
+  it('admin: a pending file is NOT_FOUND', async () => {
+    await expect(filesService.getDetail(adminCtx, FILE, detailDeps('admin', fileRow({ status: 'pending' })))).rejects.toBeInstanceOf(AppError)
+  })
+
+  it('member: a public file yields the simple DTO without e-mail, uploader, restrictions or storage fields', async () => {
+    const r = await filesService.getDetail(ctx, FILE, detailDeps('member', fileRow()))
+    expect(r).toEqual({
+      access: 'member',
+      file: {
+        id: FILE,
+        folderId: FOLDER,
+        folderName: 'Docs',
+        displayName: 'doc',
+        sizeBytes: 100,
+        updatedAt: '2026-10-02T00:00:00.000Z',
+        downloadAllowed: true,
+      },
+    })
+    const keys = r.access === 'member' ? Object.keys(r.file).sort() : []
+    expect(keys).toEqual(['displayName', 'downloadAllowed', 'folderId', 'folderName', 'id', 'sizeBytes', 'updatedAt'])
+    expect(JSON.stringify(r)).not.toMatch(/email|storage|uploadedBy|restrictions|originalFilename/i)
+  })
+
+  it.each([
+    ['suspended', { suspended: true }],
+    ['not started', { viewStartsAt: new Date('2026-10-09T00:00:00Z') }],
+    ['view ended', { viewEndsAt: now }],
+    ['expired', { expiresAt: now }],
+    ['pending', { status: 'pending' as const }],
+  ])('member: a %s file is NOT_FOUND (the state is not revealed)', async (_n, over) => {
+    const e = await filesService.getDetail(ctx, FILE, detailDeps('member', fileRow(over))).catch((x: unknown) => x)
+    expect(e).toBeInstanceOf(AppError)
+    expect((e as AppError).shape.code).toBe('NOT_FOUND')
+  })
+
+  it('a non-uuid id is NOT_FOUND without a query', async () => {
+    const d = detailDeps('admin', fileRow())
+    await expect(filesService.getDetail(adminCtx, 'abc', d)).rejects.toBeInstanceOf(AppError)
+    expect(d.load).not.toHaveBeenCalled()
+  })
+
+  it('the member DTO type has no e-mail (type-level)', () => {
+    expectTypeOf<MemberFileDetail>().not.toHaveProperty('email')
+    expectTypeOf<MemberFileDetail>().not.toHaveProperty('uploadedBy')
+    expectTypeOf<MemberFileDetail>().not.toHaveProperty('restrictions')
+  })
+})
+
+describe('files.getUploadContext (06 9.8)', () => {
+  const limits = { maxFileBytes: 50 * MB, userLimitBytes: 900 * MB, totalLimitBytes: 1000 * MB }
+  it('returns the folder, the limits and the used bytes', async () => {
+    const d: UploadContextDeps = {
+      load: vi.fn(async () => ({ folder: { id: FOLDER, name: 'Docs' }, userUsed: 10, totalUsed: 30 })),
+      limits: () => limits,
+    }
+    expect(await filesService.getUploadContext(adminCtx, FOLDER, d)).toEqual({
+      folder: { id: FOLDER, name: 'Docs' },
+      maxFileSizeBytes: 50 * MB,
+      userQuota: { usedBytes: 10, limitBytes: 900 * MB },
+      totalQuota: { usedBytes: 30, limitBytes: 1000 * MB },
+    })
+  })
+
+  it('a non-uuid folder id is NOT_FOUND without a query; an authz error from load propagates', async () => {
+    const load = vi.fn(async () => {
+      throw new AppError({ code: 'FORBIDDEN', message: 'x' })
+    })
+    const d: UploadContextDeps = { load, limits: () => limits }
+    await expect(filesService.getUploadContext(ctx, 'abc', d)).rejects.toBeInstanceOf(AppError)
+    expect(load).not.toHaveBeenCalled()
+    await expect(filesService.getUploadContext(ctx, FOLDER, d)).rejects.toMatchObject({ shape: { code: 'FORBIDDEN' } })
   })
 })

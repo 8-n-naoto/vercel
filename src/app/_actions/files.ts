@@ -1,9 +1,8 @@
 'use server'
 // 06 7.1 - 7.6. startUpload / finalizeUpload / cancelUpload are implemented (services/uploads.ts);
-// update / updateRestrictions / delete are STUBs until WP-4.2 (same signatures, they answer NOT_FOUND).
+// update / updateRestrictions / delete are in services/file-edits.ts (WP-4.2).
 import { revalidatePath } from 'next/cache'
 import type { FileDetail } from '@/lib/dto'
-import { appError } from '@/lib/errors'
 import {
   filesCancelUploadInput,
   filesDeleteInput,
@@ -13,6 +12,7 @@ import {
   filesUpdateRestrictionsInput,
 } from '@/lib/schemas/files'
 import { defineAction } from '@/server/actions/define-action'
+import { fileEditsService } from '@/server/services/file-edits'
 import { uploadsService } from '@/server/services/uploads'
 
 function revalidateFile(folderId: string, fileId: string): void {
@@ -54,35 +54,38 @@ export const filesCancelUpload = defineAction({
   },
 })
 
-// STUB: WP-4.2 replaces.
 export const filesUpdate = defineAction({
   name: 'files.update',
   auth: 'admin',
   input: filesUpdateInput,
   rateLimit: [],
-  handler: async (): Promise<FileDetail> => {
-    throw appError('NOT_FOUND', 'common.not_found')
+  handler: async (ctx, input): Promise<FileDetail> => {
+    const out = await fileEditsService.update(ctx, input)
+    revalidateFile(out.folderId, out.id)
+    return out
   },
 })
 
-// STUB: WP-4.2 replaces.
 export const filesUpdateRestrictions = defineAction({
   name: 'files.updateRestrictions',
   auth: 'admin',
   input: filesUpdateRestrictionsInput,
   rateLimit: [],
-  handler: async (): Promise<FileDetail> => {
-    throw appError('NOT_FOUND', 'common.not_found')
+  handler: async (ctx, input): Promise<FileDetail> => {
+    const out = await fileEditsService.updateRestrictions(ctx, input)
+    revalidateFile(out.folderId, out.id)
+    return out
   },
 })
 
-// STUB: WP-4.2 replaces.
 export const filesDelete = defineAction({
   name: 'files.delete',
   auth: 'admin',
   input: filesDeleteInput,
   rateLimit: [],
-  handler: async (): Promise<{ revokedLinks: number; purged: boolean }> => {
-    throw appError('NOT_FOUND', 'common.not_found')
+  handler: async (ctx, input): Promise<{ revokedLinks: number; purged: boolean }> => {
+    const out = await fileEditsService.delete(ctx, input)
+    revalidatePath('/folders', 'layout') // the result has no folder id: refresh the folder list / detail pages
+    return out
   },
 })
