@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { connection } from 'next/server'
 import './globals.css'
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -12,7 +13,10 @@ export const metadata: Metadata = {
   description: 'Internal file sharing',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Render per request: Next only puts the CSP nonce (set by src/proxy.ts) on its scripts for dynamic pages. A prerendered page
+  // has no nonce, and script-src with strict-dynamic then blocks every script (found in T-010 on next start).
+  await connection()
   return (
     <html lang="ja" className={cn("font-sans", geist.variable)}>
       <body>{children}</body>
