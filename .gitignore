@@ -29,6 +29,9 @@ playwright-report/
 blob-report/
 playwright/.cache/
 
+# ===== 巨大な試験用 HTML（npm run gen:probe で生成。50MB 級のためコミットしない） =====
+/e2e/assets/large-*.html
+
 # ===== バックアップ（pg_dump の出力。暗号化済みでもコミットしない） =====
 backups/
 *.dump

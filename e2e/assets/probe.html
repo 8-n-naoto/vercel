@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>probe</title>
+</head>
+<body>
+<h1>probe</h1>
+<p>Each line below is written by a script. A line with "blocked" means the isolation worked.</p>
+<ul id="results"></ul>
+<script>
+(function () {
+  var list = document.getElementById('results');
+  function report(id, text) {
+    var li = document.createElement('li');
+    li.id = 'probe-' + id;
+    li.textContent = id + ': ' + text;
+    list.appendChild(li);
+  }
+  function errName(e) { return (e && e.name) ? e.name : String(e); }
+
+  // 1. Cookie read. Under sandbox="allow-scripts" (opaque origin) reading throws SecurityError or returns an empty string.
+  try {
+    var c = document.cookie;
+    report('cookie', c === '' ? 'empty' : 'READABLE length=' + c.length);
+  } catch (e) {
+    report('cookie', 'blocked (' + errName(e) + ')');
+  }
+
+  // 2. Top navigation. Without allow-top-navigation this throws or is ignored. The script cannot see an ignored navigation,
+  //    so "attempted" means no exception; the E2E test checks that the top page URL did not change.
+  try {
+    window.top.location.href = 'https://example.invalid/top-navigation';
+    report('top', 'attempted (no exception; verify the top URL did not change)');
+  } catch (e) {
+    report('top', 'blocked (' + errName(e) + ')');
+  }
+
+  // 3. Form submit to an external URL. Without allow-forms the submission is ignored silently.
+  try {
+    var f = document.createElement('form');
+    f.method = 'post';
+    f.action = 'https://example.invalid/form-submit';
+    document.body.appendChild(f);
+    f.submit();
+    report('form', 'attempted (no exception; verify no navigation happened)');
+  } catch (e) {
+    report('form', 'blocked (' + errName(e) + ')');
+  }
+
+  // 4. window.open. Without allow-popups it returns null.
+  try {
+    var w = window.open('https://example.invalid/popup', '_blank');
+    report('open', w ? 'OPENED' : 'blocked (null)');
+  } catch (e) {
+    report('open', 'blocked (' + errName(e) + ')');
+  }
+
+  // 5. External fetch (CSP connect-src 'none' on the content origin should reject it).
+  try {
+    fetch('https://example.invalid/fetch', { mode: 'no-cors' }).then(
+      function () { report('fetch', 'RESOLVED (not blocked by CSP; DNS for .invalid should still fail)'); },
+      function (e) { report('fetch', 'blocked (' + errName(e) + ')'); }
+    );
+  } catch (e) {
+    report('fetch', 'blocked (' + errName(e) + ')');
+  }
+
+  // 6. External image (CSP img-src). onerror fires when it is blocked or when the host does not exist.
+  var img = new Image();
+  img.onload = function () { report('image', 'LOADED'); };
+  img.onerror = function () { report('image', 'blocked (error event)'); };
+  img.src = 'https://example.invalid/pixel.gif';
+})();
+</script>
+</body>
+</html>

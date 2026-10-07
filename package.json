@@ -22,6 +22,7 @@
     "seed:cleanup": "tsx scripts/guard-env.ts && tsx scripts/seed-cleanup.ts",
     "gen:probe": "tsx scripts/gen-probe-html.ts",
     "env:show": "tsx scripts/show-env.ts",
+    "verify-db": "tsx scripts/ops/verify-db.ts",
     "audit": "npm audit --omit=dev --audit-level=high",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
