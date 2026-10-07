@@ -95,3 +95,19 @@ describe.skipIf(!dbUp)('folders.* / members.* are in the matrix as admin-only (W
     })
   }
 })
+
+// 02 10 phase 3 / appendix A: the upload and file Actions are admin-only. A member calling files.startUpload directly gets FORBIDDEN
+// (AZ-02 above, with the valid input registered in AZ_INPUTS). This guard fails if one of them is registered with a weaker auth or disappears.
+describe.skipIf(!dbUp)('files.* are in the matrix as admin-only (WP-4.7)', () => {
+  for (const name of ['files.startUpload', 'files.finalizeUpload', 'files.cancelUpload', 'files.update', 'files.updateRestrictions', 'files.delete']) {
+    it(`${name} is registered with auth: admin (AZ-01 / 02 / 05 / 06 run for it above)`, () => {
+      expect(adminOnly.map((a) => a.name)).toContain(name)
+    })
+  }
+  it('AZ-02 files.startUpload called directly by a member is FORBIDDEN', async () => {
+    const u = await createTestUser('user')
+    await signIn(u)
+    const a = adminOnly.find((x) => x.name === 'files.startUpload')
+    expect(await a?.run(AZ_INPUTS['files.startUpload'])).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
+  })
+})

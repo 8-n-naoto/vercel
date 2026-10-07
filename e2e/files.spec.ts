@@ -168,6 +168,88 @@ test.describe('files flow (needs DB, seed and WP-4.1 / WP-4.2)', () => {
     // Implemented with WP-6.3 together with D03 / D04 and S07-4 / S07-5.
   })
 
+  // ---- WP-4.7 (T-040): 02 10 phase 3 (1) / (2) browser layer and the abnormal kinds ----------------------------------------------
+  const UPLOADED_URL = /\/folders\/[0-9a-f-]{36}\/files\/[0-9a-f-]{36}\?uploaded=1$/
+
+  test('P3-1 a 50MB HTML (exactly the limit, generated in the test) uploads and becomes active (S07 shows the uploaded notice and 公開中)', async ({ page }) => {
+    test.setTimeout(300_000)
+    await signIn(page, ADMIN.email)
+    await page.goto(`${folderUrl}/upload`)
+    const head = Buffer.from('<!doctype html><html><head><meta charset="utf-8"><title>max</title></head><body>', 'utf-8')
+    const body = Buffer.alloc(50 * 1024 * 1024, 0x61)
+    head.copy(body)
+    await page.getByLabel('アップロードするファイル').setInputFiles({ name: 'max50.html', mimeType: 'text/html', buffer: body })
+    await expect(page.getByText(/ファイルサイズが上限/)).toHaveCount(0)
+    await page.getByLabel('表示名').fill(`abn-${runId}-max`)
+    await page.getByRole('button', { name: 'アップロード', exact: true }).click()
+    await expect(page).toHaveURL(UPLOADED_URL, { timeout: 240_000 })
+    await expect(page.getByText('公開中').first()).toBeVisible()
+  })
+
+  test('P3-2 browser layer: 50MB + 1 byte generated in the test is refused with the size message, and so is a .htm.exe name; the list does not grow', async ({ page }) => {
+    await signIn(page, ADMIN.email)
+    await page.goto(`${folderUrl}/upload`)
+    await page.getByLabel('アップロードするファイル').setInputFiles({ name: 'over.html', mimeType: 'text/html', buffer: Buffer.alloc(50 * 1024 * 1024 + 1, 0x61) })
+    await expect(page.getByText(/ファイルサイズが上限（\d+MB）を超えています/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'アップロード', exact: true })).toBeDisabled()
+    await page.getByRole('button', { name: '選び直す' }).click()
+    await page.getByLabel('アップロードするファイル').setInputFiles({ name: 'evil.htm.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('<p>x') })
+    await expect(page.getByText('.html または .htm のファイルを選択してください')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'アップロード', exact: true })).toBeDisabled()
+    await page.goto(folderUrl)
+    await expect(page.getByText('over')).toHaveCount(0)
+    await expect(page.getByText('evil')).toHaveCount(0)
+  })
+
+  test('P3-3 destructive HTML (probe.html) is accepted at upload; the S07 page is not navigated away, no dialog opens, and no popup is created (isolation is WP-5.5)', async ({ page }) => {
+    await signIn(page, ADMIN.email)
+    const dialogs: string[] = []
+    page.on('dialog', (d) => {
+      dialogs.push(d.message())
+      void d.dismiss()
+    })
+    let popups = 0
+    page.on('popup', () => {
+      popups += 1
+    })
+    await page.goto(`${folderUrl}/upload`)
+    await page.getByLabel('アップロードするファイル').setInputFiles('e2e/assets/probe.html')
+    await page.getByLabel('表示名').fill(`abn-${runId}-probe`)
+    await page.getByRole('button', { name: 'アップロード', exact: true }).click()
+    await expect(page).toHaveURL(UPLOADED_URL, { timeout: 60_000 })
+    await expect(page.getByText('アップロードしました。閲覧制限と公開リンクを確認してください')).toBeVisible()
+    expect(dialogs).toEqual([])
+    expect(popups).toBe(0)
+  })
+
+  for (const [asset, label] of [
+    ['charset-utf8-bom.html', 'UTF-8'],
+    ['charset-shift_jis.html', 'Shift_JIS'],
+    ['charset-euc-jp.html', 'EUC-JP'],
+    ['charset-iso-2022-jp.html', 'ISO-2022-JP'],
+  ] as const) {
+    test(`P3-4 charset ${asset}: uploads and S07 shows the estimated charset ${label}`, async ({ page }) => {
+      await signIn(page, ADMIN.email)
+      await page.goto(`${folderUrl}/upload`)
+      await page.getByLabel('アップロードするファイル').setInputFiles(`e2e/assets/${asset}`)
+      await page.getByLabel('表示名').fill(`abn-${runId}-${label}`)
+      await page.getByRole('button', { name: 'アップロード', exact: true }).click()
+      await expect(page).toHaveURL(UPLOADED_URL, { timeout: 60_000 })
+      await expect(page.getByLabel('文字コード')).toContainText(label)
+    })
+  }
+
+  test('P3-5 a UTF-16 file named .html is rejected with the not-text message and the list does not grow', async ({ page }) => {
+    await signIn(page, ADMIN.email)
+    await page.goto(`${folderUrl}/upload`)
+    const utf16 = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('<p>utf16</p>', 'utf16le')])
+    await page.getByLabel('アップロードするファイル').setInputFiles({ name: 'utf16.html', mimeType: 'text/html', buffer: utf16 })
+    await page.getByRole('button', { name: 'アップロード', exact: true }).click()
+    await expect(page.getByRole('alert')).toContainText('テキスト（HTML）ではないファイルです')
+    await page.goto(folderUrl)
+    await expect(page.getByText('utf16')).toHaveCount(0)
+  })
+
   test('S07-7 deleting the file returns to S05 and the file is gone', async ({ page }) => {
     await signIn(page, ADMIN.email)
     await page.goto(folderUrl)
