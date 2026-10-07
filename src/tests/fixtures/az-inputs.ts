@@ -19,4 +19,6 @@ export const AZ_INPUTS: Record<string, unknown> = {
   'files.update': { fileId: '00000000-0000-4000-8000-000000000005', displayName: 'AZ File' },
   'files.updateRestrictions': { fileId: '00000000-0000-4000-8000-000000000005', suspended: false, viewStartsAt: null, viewEndsAt: null, expiresAt: null, downloadAllowed: false },
   'files.delete': { fileId: '00000000-0000-4000-8000-000000000005' },
+  'view.openAsMember': { fileId: '00000000-0000-4000-8000-000000000005' },
+  'view.requestMemberDownload': { fileId: '00000000-0000-4000-8000-000000000005' },
 }
