@@ -1,0 +1,76 @@
+# ===== 秘密情報・環境設定 =====
+# .env.example 以外の .env 系はすべて除外（.env.testing / .env.local 等を含む）
+.env
+.env.*
+!.env.example
+/auth.json
+*.pem
+*.key
+/*.md
+
+# ===== 依存パッケージ =====
+/vendor
+/node_modules
+
+# ===== ビルド成果物・公開ディレクトリ =====
+/public/build
+/public/hot
+/public/storage
+/public/fonts-manifest.dev.json
+
+# ===== Laravel ランタイム =====
+/storage/*.key
+/storage/pail
+/bootstrap/cache/*.php
+_ide_helper.php
+_ide_helper_models.php
+.phpstorm.meta.php
+
+# ===== ローカル DB =====
+*.sqlite
+*.sqlite-journal
+
+# ===== テスト・解析の出力 =====
+.phpunit.result.cache
+/.phpunit.cache
+/coverage
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache
+.php-cs-fixer.cache
+.eslintcache
+*.tsbuildinfo
+
+# ===== ログ =====
+*.log
+
+# ===== エディタ・IDE =====
+.phpactor.json
+/.codex
+/.cursor/
+/.idea
+/.nova
+/.vscode
+/.zed
+*.swp
+
+# ===== エージェント設定・ドキュメント・退避ファイル（ローカルのみで管理） =====
+/.claude
+/docs
+/_archive
+
+# ===== テスト（ローカルのみで管理） =====
+/tests
+/phpunit.xml
+/playwright.config.ts
+/vitest.config.ts
+
+# ===== Homestead =====
+Homestead.json
+Homestead.yaml
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
