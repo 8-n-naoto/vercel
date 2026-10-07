@@ -3,7 +3,7 @@ import * as repositories from './index'
 import { NotImplementedError } from './not-implemented'
 
 // Repositories already implemented by their WP (WP-1.4: rate_limits, audit_logs; WP-1.3: profiles.findProfileById); they need a DB and are covered by integration tests.
-const IMPLEMENTED = new Set(['incrementRateLimit', 'incrementRateLimitAt', 'deleteRateLimitsByKeyPrefix', 'binWindowStart', 'countRateLimitRows', 'insertAuditLog', 'findProfileById', 'touchLastLogin'])
+const IMPLEMENTED = new Set(['incrementRateLimit', 'incrementRateLimitAt', 'deleteRateLimitsByKeyPrefix', 'binWindowStart', 'countRateLimitRows', 'insertAuditLog', 'findProfileById', 'touchLastLogin', 'lockProfileForUpdate', 'findProfileView', 'updateDisplayName', 'setSessionRevokedAt'])
 
 type AnyRepoFn = (...args: never[]) => Promise<unknown>
 

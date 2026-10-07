@@ -29,6 +29,36 @@ export async function touchLastLogin(executor: Tx | Db, id: string, now: Date): 
   await executor.update(profiles).set({ lastLoginAt: now }).where(eq(profiles.id, id))
 }
 
+/** Locks the row (FOR UPDATE) and returns the ProfileView columns (06 4.5). Call inside the business transaction. */
+export async function lockProfileForUpdate(tx: Tx, id: string) {
+  const rows = await tx
+    .select({ id: profiles.id, email: profiles.email, displayName: profiles.displayName, role: profiles.role, createdAt: profiles.createdAt })
+    .from(profiles)
+    .where(eq(profiles.id, id))
+    .for('update')
+    .limit(1)
+  return rows[0]
+}
+
+/** Same columns without a lock (06 9.19). */
+export async function findProfileView(id: string) {
+  const rows = await getDb()
+    .select({ id: profiles.id, email: profiles.email, displayName: profiles.displayName, role: profiles.role, createdAt: profiles.createdAt })
+    .from(profiles)
+    .where(eq(profiles.id, id))
+    .limit(1)
+  return rows[0]
+}
+
+export async function updateDisplayName(tx: Tx, id: string, displayName: string): Promise<void> {
+  await tx.update(profiles).set({ displayName }).where(eq(profiles.id, id))
+}
+
+/** Invalidates every existing session of the user (06 4.6 step 3). */
+export async function setSessionRevokedAt(tx: Tx, id: string, at: Date): Promise<void> {
+  await tx.update(profiles).set({ sessionRevokedAt: at }).where(eq(profiles.id, id))
+}
+
 export type SessionProfile = NonNullable<Awaited<ReturnType<typeof findProfileById>>>
 
 export async function findProfileByEmail(email: string): Promise<ProfileRow | undefined> {
