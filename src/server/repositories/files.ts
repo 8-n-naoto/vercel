@@ -1,10 +1,12 @@
 import 'server-only'
-import { and, eq, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, lte, ne, not, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
-import { files, folderMembers, folders } from '@/server/db/schema'
+import { files, folderMembers, folders, shareLinks } from '@/server/db/schema'
 import type { Db, Tx } from './audit-logs'
+import type { Reader } from './reader'
 import type { FolderLockMode } from './folders'
 import { notImplemented } from './not-implemented'
+import { activeShareLinkSql } from './share-links'
 
 export type FileRow = typeof files.$inferSelect
 
@@ -38,4 +40,81 @@ export async function findFileWithFolderAndMembership(tx: Tx | Db, fileId: strin
       ? await q
       : await q.for(lock, { of: f })
   return rows[0]
+}
+
+/** FILE_PUBLIC_SQL (07 11.1): the SQL form of fileDisplayState = 'public'. $now = ctx.now. Uses the unaliased files table. */
+export function filePublicSql(now: Date) {
+  return and(
+    not(files.suspended),
+    or(isNull(files.expiresAt), gt(files.expiresAt, now)),
+    or(isNull(files.viewStartsAt), lte(files.viewStartsAt, now)),
+    or(isNull(files.viewEndsAt), gt(files.viewEndsAt, now)),
+  )
+}
+
+/** 06 6.3 step 2: pending and active files of the folder, locked in id order. */
+export async function lockFolderFilesForDelete(tx: Tx, folderId: string) {
+  return tx
+    .select({ id: files.id, storagePath: files.storagePath })
+    .from(files)
+    .where(and(eq(files.folderId, folderId), inArray(files.status, ['pending', 'active'])))
+    .orderBy(asc(files.id))
+    .for('update')
+}
+
+/** 06 6.3 step 3. */
+export async function markFilesDeletedByFolder(tx: Tx, ids: string[], by: string, at: Date): Promise<void> {
+  if (ids.length === 0) return
+  await tx
+    .update(files)
+    .set({ status: 'deleted', deletedAt: at, deletedBy: by, deleteReason: 'folder_deleted', uploadExpiresAt: null })
+    .where(inArray(files.id, ids))
+}
+
+/** 06 6.3 step 7: one statement for the files whose objects were removed. */
+export async function markFilesPurged(db: Reader, ids: string[], at: Date): Promise<void> {
+  if (ids.length === 0) return
+  await db.update(files).set({ purgedAt: at }).where(inArray(files.id, ids))
+}
+
+export type FileListSort = 'updated_desc' | 'name_asc' | 'size_desc'
+
+function orderFor(sort: FileListSort) {
+  switch (sort) {
+    case 'name_asc':
+      return [asc(files.displayName), asc(files.id)]
+    case 'size_desc':
+      return [desc(files.sizeBytes), asc(files.id)]
+    default:
+      return [desc(files.updatedAt), asc(files.id)]
+  }
+}
+
+/** 06 9.4 (admin): active files with the number of active share links, in one statement. */
+export async function listActiveFilesForAdmin(db: Reader, folderId: string, sort: FileListSort, now: Date) {
+  return db
+    .select({
+      id: files.id,
+      folderId: files.folderId,
+      displayName: files.displayName,
+      sizeBytes: files.sizeBytes,
+      suspended: files.suspended,
+      viewStartsAt: files.viewStartsAt,
+      viewEndsAt: files.viewEndsAt,
+      expiresAt: files.expiresAt,
+      updatedAt: files.updatedAt,
+      activeShareLinkCount: sql<number>`(select count(*)::int from ${shareLinks} where ${shareLinks.fileId} = ${files.id} and ${activeShareLinkSql(now)})`,
+    })
+    .from(files)
+    .where(and(eq(files.folderId, folderId), eq(files.status, 'active')))
+    .orderBy(...orderFor(sort))
+}
+
+/** 06 9.4 (member): only the files whose display state is public. */
+export async function listPublicFilesForMember(db: Reader, folderId: string, sort: FileListSort, now: Date) {
+  return db
+    .select({ id: files.id, folderId: files.folderId, displayName: files.displayName, sizeBytes: files.sizeBytes, updatedAt: files.updatedAt })
+    .from(files)
+    .where(and(eq(files.folderId, folderId), eq(files.status, 'active'), filePublicSql(now)))
+    .orderBy(...orderFor(sort))
 }

@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, eq, isNull, ne } from 'drizzle-orm'
+import { and, eq, gt, inArray, isNull, lt, ne, or } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { files, folders, shareLinks } from '@/server/db/schema'
 import type { Db, Tx } from './audit-logs'
@@ -29,4 +29,20 @@ export async function findShareLinkWithFileAndFolder(tx: Tx | Db, linkId: string
     .limit(1)
   const rows = lockLink ? await q.for('update', { of: sl }) : await q
   return rows[0]
+}
+
+/** 06 6.3 step 4: revokes every open link of the files; returns the number of revoked links. */
+export async function revokeLinksForDeletedFolder(tx: Tx, fileIds: string[], by: string, at: Date): Promise<number> {
+  if (fileIds.length === 0) return 0
+  const rows = await tx
+    .update(shareLinks)
+    .set({ revokedAt: at, revokedBy: by, revokeReason: 'folder_deleted' })
+    .where(and(inArray(shareLinks.fileId, fileIds), isNull(shareLinks.revokedAt)))
+    .returning({ id: shareLinks.id })
+  return rows.length
+}
+
+/** The share link condition of 06 9.4 (same rule as the active state of 07 11.2). */
+export function activeShareLinkSql(now: Date) {
+  return and(isNull(shareLinks.revokedAt), gt(shareLinks.expiresAt, now), or(isNull(shareLinks.maxViews), lt(shareLinks.viewCount, shareLinks.maxViews)))
 }
