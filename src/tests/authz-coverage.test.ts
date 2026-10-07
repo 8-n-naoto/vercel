@@ -23,8 +23,6 @@ const APPROVED_ROUTES: Record<string, { auth: string; host: string }> = {
 }
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
 const ROUTE_SEGMENT_CONFIG = ['maxDuration', 'dynamic', 'runtime', 'preferredRegion', 'revalidate']
-// The WP-0.1 placeholder page has no data access. Remove this entry when WP-0.9 replaces it (08 3).
-const PAGES_WITHOUT_PAGE_CONTEXT = ['src/app/page.tsx']
 
 const stripGroups = (p: string) => p.split('/').filter((s) => !(s.startsWith('(') && s.endsWith(')'))).join('/')
 const routeOf = (file: string, suffix: RegExp) => '/' + stripGroups(file.replace(/^src\/app\//, '').replace(suffix, '')).replace(/^\/+|\/+$/g, '')
@@ -118,7 +116,7 @@ describe('authz coverage: pages (06 11)', () => {
     for (const f of pageFiles) {
       const src = read(f)
       if (!/\bpageContext\s*\(/.test(src)) {
-        if (!PAGES_WITHOUT_PAGE_CONTEXT.includes(f)) noContext.push(f)
+        noContext.push(f)
         continue
       }
       if (/\bauth:\s*(['"])public\1/.test(src)) publicPages.push(routeOf(f, /\/page\.tsx$/))
