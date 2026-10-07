@@ -13,4 +13,10 @@ export const AZ_INPUTS: Record<string, unknown> = {
   'folders.delete': { folderId: '00000000-0000-4000-8000-000000000003', confirmName: 'AZ Folder' },
   'members.add': { folderId: '00000000-0000-4000-8000-000000000003', userIds: ['00000000-0000-4000-8000-000000000004'] },
   'members.remove': { folderId: '00000000-0000-4000-8000-000000000003', userId: '00000000-0000-4000-8000-000000000004' },
+  'files.startUpload': { folderId: '00000000-0000-4000-8000-000000000003', originalFilename: 'az.html', displayName: null, sizeBytes: 10, contentType: 'text/html' },
+  'files.finalizeUpload': { fileId: '00000000-0000-4000-8000-000000000005' },
+  'files.cancelUpload': { fileId: '00000000-0000-4000-8000-000000000005' },
+  'files.update': { fileId: '00000000-0000-4000-8000-000000000005', displayName: 'AZ File' },
+  'files.updateRestrictions': { fileId: '00000000-0000-4000-8000-000000000005', suspended: false, viewStartsAt: null, viewEndsAt: null, expiresAt: null, downloadAllowed: false },
+  'files.delete': { fileId: '00000000-0000-4000-8000-000000000005' },
 }

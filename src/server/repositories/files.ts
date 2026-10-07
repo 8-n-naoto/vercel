@@ -118,3 +118,46 @@ export async function listPublicFilesForMember(db: Reader, folderId: string, sor
     .where(and(eq(files.folderId, folderId), eq(files.status, 'active'), filePublicSql(now)))
     .orderBy(...orderFor(sort))
 }
+
+/** 07 6 usage: one statement over pending + active files. Call after locking the actor's profiles row. */
+export async function sumQuotaUsage(tx: Tx, userId: string): Promise<{ userUsed: number; totalUsed: number }> {
+  const rows = await tx
+    .select({
+      userUsed: sql<number>`coalesce(sum(${files.sizeBytes}) filter (where ${files.uploadedBy} = ${userId}), 0)::float8`,
+      totalUsed: sql<number>`coalesce(sum(${files.sizeBytes}), 0)::float8`,
+    })
+    .from(files)
+    .where(inArray(files.status, ['pending', 'active']))
+  const r = rows[0]
+  return { userUsed: Number(r?.userUsed ?? 0), totalUsed: Number(r?.totalUsed ?? 0) }
+}
+
+/** 06 7.1 step 5. storage_path must equal folder_id/id.html (files_storage_path_ck). */
+export async function insertPendingFile(
+  tx: Tx,
+  v: { id: string; folderId: string; uploadedBy: string; displayName: string; originalFilename: string; storagePath: string; sizeBytes: number; uploadExpiresAt: Date },
+): Promise<void> {
+  await tx.insert(files).values({ ...v, status: 'pending', charset: 'utf-8', contentType: 'text/html' })
+}
+
+/** 06 7.2 / 7.3: pending -> deleted. purgedAt is set only when the object is already gone. */
+export async function markFileDeleted(
+  tx: Tx,
+  id: string,
+  v: { by: string; at: Date; reason: NonNullable<FileRow['deleteReason']>; purgedAt: Date | null },
+): Promise<void> {
+  await tx
+    .update(files)
+    .set({ status: 'deleted', deletedAt: v.at, deletedBy: v.by, deleteReason: v.reason, uploadExpiresAt: null, purgedAt: v.purgedAt })
+    .where(eq(files.id, id))
+}
+
+/** 06 7.2 step 5: pending -> active with the measured size. Returns the updated row. */
+export async function activateFile(tx: Tx, id: string, v: { sizeBytes: number; charset: FileRow['charset']; at: Date }): Promise<FileRow | undefined> {
+  const rows = await tx
+    .update(files)
+    .set({ status: 'active', sizeBytes: v.sizeBytes, charset: v.charset, activatedAt: v.at, uploadExpiresAt: null })
+    .where(and(eq(files.id, id), eq(files.status, 'pending')))
+    .returning()
+  return rows[0]
+}
