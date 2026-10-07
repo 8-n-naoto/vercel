@@ -23,7 +23,7 @@ export const options = {
   },
 }
 
-export default function () {
+export default function scenario() {
   const t0 = Date.now()
   const { res, ticket } = openAsMember(env('PERF_FILE_ID'))
   openMs.add(res.timings.duration)

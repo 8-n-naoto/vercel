@@ -21,7 +21,7 @@ export const options = {
   },
 }
 
-export default function () {
+export default function scenario() {
   const folderId = env('PERF_FOLDER_ID')
   const fileId = env('PERF_FILE_ID')
   const targets = [

@@ -17,7 +17,7 @@ export const options = {
   thresholds: { raw_total: ['max<30000'], http_req_failed: ['rate<0.01'] },
 }
 
-export default function () {
+export default function scenario() {
   const { res, ticket } = openAsMember(env('PERF_LARGE_FILE_ID'))
   if (!check(res, { 'action 200': (r) => r.status === 200 }) || ticket === null) return
   const raw = http.get(`${contentOrigin()}/raw/${ticket}`, { headers: { 'Sec-Fetch-Dest': 'iframe' }, redirects: 0, tags: { name: 'raw_large' }, timeout: '300s' })
