@@ -1,0 +1,1858 @@
+{
+  "id": "e236977e-8a27-4373-9e83-cfeec9b6d01f",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "app.access_logs": {
+      "name": "access_logs",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "access_logs_id_seq",
+            "schema": "app",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "file_id": {
+          "name": "file_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "folder_id": {
+          "name": "folder_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "via": {
+          "name": "via",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "share_link_id": {
+          "name": "share_link_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "result": {
+          "name": "result",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deny_reason": {
+          "name": "deny_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ticket_hash": {
+          "name": "ticket_hash",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ticket_expires_at": {
+          "name": "ticket_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delivered_at": {
+          "name": "delivered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bytes_sent": {
+          "name": "bytes_sent",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ip": {
+          "name": "ip",
+          "type": "inet",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "access_logs_file_id_occurred_at_idx": {
+          "name": "access_logs_file_id_occurred_at_idx",
+          "columns": [
+            {
+              "expression": "file_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "access_logs_folder_id_occurred_at_idx": {
+          "name": "access_logs_folder_id_occurred_at_idx",
+          "columns": [
+            {
+              "expression": "folder_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "access_logs_share_link_id_occurred_at_idx": {
+          "name": "access_logs_share_link_id_occurred_at_idx",
+          "columns": [
+            {
+              "expression": "share_link_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "access_logs_occurred_at_idx": {
+          "name": "access_logs_occurred_at_idx",
+          "columns": [
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "access_logs_delivered_at_idx": {
+          "name": "access_logs_delivered_at_idx",
+          "columns": [
+            {
+              "expression": "delivered_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "delivered_at IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "access_logs_ticket_expires_at_idx": {
+          "name": "access_logs_ticket_expires_at_idx",
+          "columns": [
+            {
+              "expression": "ticket_expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "ticket_hash IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "access_logs_file_id_fkey": {
+          "name": "access_logs_file_id_fkey",
+          "tableFrom": "access_logs",
+          "tableTo": "files",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "file_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "access_logs_folder_id_fkey": {
+          "name": "access_logs_folder_id_fkey",
+          "tableFrom": "access_logs",
+          "tableTo": "folders",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "folder_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "access_logs_share_link_id_fkey": {
+          "name": "access_logs_share_link_id_fkey",
+          "tableFrom": "access_logs",
+          "tableTo": "share_links",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "share_link_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "access_logs_user_id_fkey": {
+          "name": "access_logs_user_id_fkey",
+          "tableFrom": "access_logs",
+          "tableTo": "profiles",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "access_logs_ticket_hash_key": {
+          "name": "access_logs_ticket_hash_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "ticket_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "access_logs_via_ck": {
+          "name": "access_logs_via_ck",
+          "value": "via IN ('member', 'admin_preview', 'share_link')"
+        },
+        "access_logs_purpose_ck": {
+          "name": "access_logs_purpose_ck",
+          "value": "purpose IN ('view', 'download')"
+        },
+        "access_logs_result_ck": {
+          "name": "access_logs_result_ck",
+          "value": "result IN ('granted', 'denied')"
+        },
+        "access_logs_via_link_ck": {
+          "name": "access_logs_via_link_ck",
+          "value": "(via = 'share_link') = (share_link_id IS NOT NULL)"
+        },
+        "access_logs_via_user_ck": {
+          "name": "access_logs_via_user_ck",
+          "value": "(via = 'share_link') = (user_id IS NULL)"
+        },
+        "access_logs_deny_reason_ck": {
+          "name": "access_logs_deny_reason_ck",
+          "value": "deny_reason IS NULL OR deny_reason IN ('NOT_FOUND', 'LINK_REVOKED', 'NOT_MEMBER', 'USER_DISABLED', 'SUSPENDED', 'FILE_EXPIRED', 'NOT_STARTED', 'ENDED', 'LINK_EXPIRED', 'DOWNLOAD_NOT_ALLOWED', 'PASSWORD_REQUIRED', 'PASSWORD_INVALID', 'VIEW_LIMIT_REACHED')"
+        },
+        "access_logs_denied_ck": {
+          "name": "access_logs_denied_ck",
+          "value": "(result = 'denied') = (deny_reason IS NOT NULL)"
+        },
+        "access_logs_ticket_ck": {
+          "name": "access_logs_ticket_ck",
+          "value": "result = 'granted' OR (ticket_hash IS NULL AND ticket_expires_at IS NULL AND delivered_at IS NULL)"
+        },
+        "access_logs_granted_ck": {
+          "name": "access_logs_granted_ck",
+          "value": "result <> 'granted' OR ticket_expires_at IS NOT NULL"
+        },
+        "access_logs_ticket_hash_ck": {
+          "name": "access_logs_ticket_hash_ck",
+          "value": "ticket_hash IS NULL OR ticket_hash ~ '^[0-9a-f]{64}$'"
+        },
+        "access_logs_delivered_ck": {
+          "name": "access_logs_delivered_ck",
+          "value": "(delivered_at IS NULL) = (bytes_sent IS NULL)"
+        },
+        "access_logs_bytes_sent_ck": {
+          "name": "access_logs_bytes_sent_ck",
+          "value": "bytes_sent IS NULL OR bytes_sent >= 0"
+        },
+        "access_logs_user_agent_ck": {
+          "name": "access_logs_user_agent_ck",
+          "value": "user_agent IS NULL OR char_length(user_agent) <= 256"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.audit_logs": {
+      "name": "audit_logs",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "audit_logs_id_seq",
+            "schema": "app",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_type": {
+          "name": "target_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "folder_id": {
+          "name": "folder_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "result": {
+          "name": "result",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'success'"
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "ip": {
+          "name": "ip",
+          "type": "inet",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "audit_logs_occurred_at_idx": {
+          "name": "audit_logs_occurred_at_idx",
+          "columns": [
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "audit_logs_actor_id_occurred_at_idx": {
+          "name": "audit_logs_actor_id_occurred_at_idx",
+          "columns": [
+            {
+              "expression": "actor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "audit_logs_target_idx": {
+          "name": "audit_logs_target_idx",
+          "columns": [
+            {
+              "expression": "target_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "target_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "audit_logs_folder_id_occurred_at_idx": {
+          "name": "audit_logs_folder_id_occurred_at_idx",
+          "columns": [
+            {
+              "expression": "folder_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "folder_id IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "audit_logs_action_occurred_at_idx": {
+          "name": "audit_logs_action_occurred_at_idx",
+          "columns": [
+            {
+              "expression": "action",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "audit_logs_actor_id_fkey": {
+          "name": "audit_logs_actor_id_fkey",
+          "tableFrom": "audit_logs",
+          "tableTo": "profiles",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "actor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "audit_logs_action_ck": {
+          "name": "audit_logs_action_ck",
+          "value": "action ~ '^[a-z_]+\\.[a-z_]+$'"
+        },
+        "audit_logs_target_type_ck": {
+          "name": "audit_logs_target_type_ck",
+          "value": "target_type IS NULL OR target_type IN ('user', 'invite', 'folder', 'member', 'file', 'share_link', 'system')"
+        },
+        "audit_logs_target_ck": {
+          "name": "audit_logs_target_ck",
+          "value": "target_id IS NULL OR target_type IS NOT NULL"
+        },
+        "audit_logs_target_id_ck": {
+          "name": "audit_logs_target_id_ck",
+          "value": "target_id IS NULL OR char_length(target_id) <= 100"
+        },
+        "audit_logs_result_ck": {
+          "name": "audit_logs_result_ck",
+          "value": "result IN ('success', 'failure')"
+        },
+        "audit_logs_metadata_ck": {
+          "name": "audit_logs_metadata_ck",
+          "value": "jsonb_typeof(metadata) = 'object'"
+        },
+        "audit_logs_user_agent_ck": {
+          "name": "audit_logs_user_agent_ck",
+          "value": "user_agent IS NULL OR char_length(user_agent) <= 256"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "auth.users": {
+      "name": "users",
+      "schema": "auth",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "app.files": {
+      "name": "files",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "folder_id": {
+          "name": "folder_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uploaded_by": {
+          "name": "uploaded_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "original_filename": {
+          "name": "original_filename",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "storage_path": {
+          "name": "storage_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'text/html'"
+        },
+        "charset": {
+          "name": "charset",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'utf-8'"
+        },
+        "size_bytes": {
+          "name": "size_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "suspended": {
+          "name": "suspended",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "view_starts_at": {
+          "name": "view_starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "view_ends_at": {
+          "name": "view_ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "download_allowed": {
+          "name": "download_allowed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "upload_expires_at": {
+          "name": "upload_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "activated_at": {
+          "name": "activated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_by": {
+          "name": "deleted_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delete_reason": {
+          "name": "delete_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "purged_at": {
+          "name": "purged_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "files_folder_id_status_idx": {
+          "name": "files_folder_id_status_idx",
+          "columns": [
+            {
+              "expression": "folder_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "files_uploaded_by_quota_idx": {
+          "name": "files_uploaded_by_quota_idx",
+          "columns": [
+            {
+              "expression": "uploaded_by",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "status IN ('pending', 'active')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "files_upload_expires_at_idx": {
+          "name": "files_upload_expires_at_idx",
+          "columns": [
+            {
+              "expression": "upload_expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "status = 'pending'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "files_expires_at_idx": {
+          "name": "files_expires_at_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "status = 'active' AND expires_at IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "files_unpurged_idx": {
+          "name": "files_unpurged_idx",
+          "columns": [
+            {
+              "expression": "deleted_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "status = 'deleted' AND purged_at IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "files_folder_id_fkey": {
+          "name": "files_folder_id_fkey",
+          "tableFrom": "files",
+          "tableTo": "folders",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "folder_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "files_uploaded_by_fkey": {
+          "name": "files_uploaded_by_fkey",
+          "tableFrom": "files",
+          "tableTo": "profiles",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "uploaded_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "files_deleted_by_fkey": {
+          "name": "files_deleted_by_fkey",
+          "tableFrom": "files",
+          "tableTo": "profiles",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "deleted_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "files_storage_path_key": {
+          "name": "files_storage_path_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "storage_path"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "files_display_name_ck": {
+          "name": "files_display_name_ck",
+          "value": "char_length(display_name) BETWEEN 1 AND 200 AND display_name = btrim(display_name)"
+        },
+        "files_original_filename_ck": {
+          "name": "files_original_filename_ck",
+          "value": "char_length(original_filename) BETWEEN 1 AND 255 AND position('/' IN original_filename) = 0 AND position(E'\\\\' IN original_filename) = 0 AND original_filename !~ '[[:cntrl:]]'"
+        },
+        "files_storage_path_ck": {
+          "name": "files_storage_path_ck",
+          "value": "storage_path = folder_id::text || '/' || id::text || '.html'"
+        },
+        "files_content_type_ck": {
+          "name": "files_content_type_ck",
+          "value": "content_type IN ('text/html')"
+        },
+        "files_charset_ck": {
+          "name": "files_charset_ck",
+          "value": "charset IN ('utf-8', 'shift_jis', 'euc-jp', 'iso-2022-jp')"
+        },
+        "files_size_bytes_ck": {
+          "name": "files_size_bytes_ck",
+          "value": "size_bytes > 0"
+        },
+        "files_status_ck": {
+          "name": "files_status_ck",
+          "value": "status IN ('pending', 'active', 'deleted')"
+        },
+        "files_view_range_ck": {
+          "name": "files_view_range_ck",
+          "value": "view_starts_at IS NULL OR view_ends_at IS NULL OR view_starts_at < view_ends_at"
+        },
+        "files_delete_reason_ck": {
+          "name": "files_delete_reason_ck",
+          "value": "delete_reason IS NULL OR delete_reason IN ('user', 'folder_deleted', 'expired', 'upload_abandoned', 'verification_failed')"
+        },
+        "files_deleted_ck": {
+          "name": "files_deleted_ck",
+          "value": "(status = 'deleted') = (deleted_at IS NOT NULL AND delete_reason IS NOT NULL)"
+        },
+        "files_deleted_by_ck": {
+          "name": "files_deleted_by_ck",
+          "value": "deleted_by IS NULL OR status = 'deleted'"
+        },
+        "files_pending_ck": {
+          "name": "files_pending_ck",
+          "value": "status <> 'pending' OR upload_expires_at IS NOT NULL"
+        },
+        "files_active_ck": {
+          "name": "files_active_ck",
+          "value": "status <> 'active' OR (activated_at IS NOT NULL AND upload_expires_at IS NULL)"
+        },
+        "files_purged_ck": {
+          "name": "files_purged_ck",
+          "value": "purged_at IS NULL OR status = 'deleted'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.folder_members": {
+      "name": "folder_members",
+      "schema": "app",
+      "columns": {
+        "folder_id": {
+          "name": "folder_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "added_by": {
+          "name": "added_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "folder_members_user_id_idx": {
+          "name": "folder_members_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "folder_members_folder_id_fkey": {
+          "name": "folder_members_folder_id_fkey",
+          "tableFrom": "folder_members",
+          "tableTo": "folders",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "folder_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "folder_members_user_id_fkey": {
+          "name": "folder_members_user_id_fkey",
+          "tableFrom": "folder_members",
+          "tableTo": "profiles",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "folder_members_added_by_fkey": {
+          "name": "folder_members_added_by_fkey",
+          "tableFrom": "folder_members",
+          "tableTo": "profiles",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "added_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "folder_members_pkey": {
+          "name": "folder_members_pkey",
+          "columns": [
+            "folder_id",
+            "user_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "app.folders": {
+      "name": "folders",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_by": {
+          "name": "deleted_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "folders_created_at_idx": {
+          "name": "folders_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "deleted_at IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "folders_created_by_fkey": {
+          "name": "folders_created_by_fkey",
+          "tableFrom": "folders",
+          "tableTo": "profiles",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "folders_deleted_by_fkey": {
+          "name": "folders_deleted_by_fkey",
+          "tableFrom": "folders",
+          "tableTo": "profiles",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "deleted_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "folders_name_ck": {
+          "name": "folders_name_ck",
+          "value": "char_length(name) BETWEEN 1 AND 100 AND name = btrim(name)"
+        },
+        "folders_description_ck": {
+          "name": "folders_description_ck",
+          "value": "char_length(description) <= 500"
+        },
+        "folders_deleted_ck": {
+          "name": "folders_deleted_ck",
+          "value": "(deleted_at IS NULL) = (deleted_by IS NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.invites": {
+      "name": "invites",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "invites_signup_open_email_uq": {
+          "name": "invites_signup_open_email_uq",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "purpose = 'signup' AND used_at IS NULL AND revoked_at IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "invites_reset_open_user_uq": {
+          "name": "invites_reset_open_user_uq",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "purpose = 'password_reset' AND used_at IS NULL AND revoked_at IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "invites_created_at_idx": {
+          "name": "invites_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "invites_expires_at_idx": {
+          "name": "invites_expires_at_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "invites_user_id_fkey": {
+          "name": "invites_user_id_fkey",
+          "tableFrom": "invites",
+          "tableTo": "profiles",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "invites_created_by_fkey": {
+          "name": "invites_created_by_fkey",
+          "tableFrom": "invites",
+          "tableTo": "profiles",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "invites_token_hash_key": {
+          "name": "invites_token_hash_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "invites_token_hash_ck": {
+          "name": "invites_token_hash_ck",
+          "value": "token_hash ~ '^[0-9a-f]{64}$'"
+        },
+        "invites_purpose_ck": {
+          "name": "invites_purpose_ck",
+          "value": "purpose IN ('signup', 'password_reset')"
+        },
+        "invites_email_lower_ck": {
+          "name": "invites_email_lower_ck",
+          "value": "email = lower(email)"
+        },
+        "invites_email_len_ck": {
+          "name": "invites_email_len_ck",
+          "value": "char_length(email) BETWEEN 3 AND 254"
+        },
+        "invites_role_ck": {
+          "name": "invites_role_ck",
+          "value": "role IS NULL OR role IN ('admin', 'user')"
+        },
+        "invites_purpose_fields_ck": {
+          "name": "invites_purpose_fields_ck",
+          "value": "(purpose = 'signup' AND role IS NOT NULL AND user_id IS NULL) OR (purpose = 'password_reset' AND role IS NULL AND user_id IS NOT NULL)"
+        },
+        "invites_used_revoked_ck": {
+          "name": "invites_used_revoked_ck",
+          "value": "used_at IS NULL OR revoked_at IS NULL"
+        },
+        "invites_expires_ck": {
+          "name": "invites_expires_ck",
+          "value": "expires_at > created_at"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.profiles": {
+      "name": "profiles",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'user'"
+        },
+        "disabled_at": {
+          "name": "disabled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "session_revoked_at": {
+          "name": "session_revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_login_at": {
+          "name": "last_login_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "profiles_id_fkey": {
+          "name": "profiles_id_fkey",
+          "tableFrom": "profiles",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "profiles_email_key": {
+          "name": "profiles_email_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "profiles_email_lower_ck": {
+          "name": "profiles_email_lower_ck",
+          "value": "email = lower(email)"
+        },
+        "profiles_email_len_ck": {
+          "name": "profiles_email_len_ck",
+          "value": "char_length(email) BETWEEN 3 AND 254"
+        },
+        "profiles_display_name_ck": {
+          "name": "profiles_display_name_ck",
+          "value": "char_length(display_name) BETWEEN 1 AND 50 AND display_name = btrim(display_name)"
+        },
+        "profiles_role_ck": {
+          "name": "profiles_role_ck",
+          "value": "role IN ('admin', 'user')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.rate_limits": {
+      "name": "rate_limits",
+      "schema": "app",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "window_start": {
+          "name": "window_start",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        }
+      },
+      "indexes": {
+        "rate_limits_window_start_idx": {
+          "name": "rate_limits_window_start_idx",
+          "columns": [
+            {
+              "expression": "window_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "rate_limits_pkey": {
+          "name": "rate_limits_pkey",
+          "columns": [
+            "key",
+            "window_start"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "rate_limits_key_ck": {
+          "name": "rate_limits_key_ck",
+          "value": "char_length(key) BETWEEN 1 AND 200"
+        },
+        "rate_limits_count_ck": {
+          "name": "rate_limits_count_ck",
+          "value": "count >= 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.share_links": {
+      "name": "share_links",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "file_id": {
+          "name": "file_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hint": {
+          "name": "token_hint",
+          "type": "char(4)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_views": {
+          "name": "max_views",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "view_count": {
+          "name": "view_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "download_allowed": {
+          "name": "download_allowed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_by": {
+          "name": "revoked_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoke_reason": {
+          "name": "revoke_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "replaced_by": {
+          "name": "replaced_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_viewed_at": {
+          "name": "last_viewed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "share_links_file_id_created_at_idx": {
+          "name": "share_links_file_id_created_at_idx",
+          "columns": [
+            {
+              "expression": "file_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "share_links_file_id_fkey": {
+          "name": "share_links_file_id_fkey",
+          "tableFrom": "share_links",
+          "tableTo": "files",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "file_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "share_links_created_by_fkey": {
+          "name": "share_links_created_by_fkey",
+          "tableFrom": "share_links",
+          "tableTo": "profiles",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "share_links_revoked_by_fkey": {
+          "name": "share_links_revoked_by_fkey",
+          "tableFrom": "share_links",
+          "tableTo": "profiles",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "revoked_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "share_links_replaced_by_fkey": {
+          "name": "share_links_replaced_by_fkey",
+          "tableFrom": "share_links",
+          "tableTo": "share_links",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "replaced_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "share_links_token_hash_key": {
+          "name": "share_links_token_hash_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "share_links_token_hash_ck": {
+          "name": "share_links_token_hash_ck",
+          "value": "token_hash ~ '^[0-9a-f]{64}$'"
+        },
+        "share_links_token_hint_ck": {
+          "name": "share_links_token_hint_ck",
+          "value": "token_hint ~ '^[A-Za-z0-9_-]{4}$'"
+        },
+        "share_links_label_ck": {
+          "name": "share_links_label_ck",
+          "value": "char_length(label) <= 100 AND label = btrim(label)"
+        },
+        "share_links_expires_ck": {
+          "name": "share_links_expires_ck",
+          "value": "expires_at > created_at"
+        },
+        "share_links_max_views_ck": {
+          "name": "share_links_max_views_ck",
+          "value": "max_views IS NULL OR max_views BETWEEN 1 AND 10000"
+        },
+        "share_links_view_count_ck": {
+          "name": "share_links_view_count_ck",
+          "value": "view_count >= 0 AND (max_views IS NULL OR view_count <= max_views)"
+        },
+        "share_links_password_hash_ck": {
+          "name": "share_links_password_hash_ck",
+          "value": "password_hash IS NULL OR password_hash LIKE 'scrypt$%'"
+        },
+        "share_links_revoke_reason_ck": {
+          "name": "share_links_revoke_reason_ck",
+          "value": "revoke_reason IS NULL OR revoke_reason IN ('user', 'reissued', 'file_deleted', 'folder_deleted')"
+        },
+        "share_links_revoked_ck": {
+          "name": "share_links_revoked_ck",
+          "value": "(revoked_at IS NULL) = (revoke_reason IS NULL)"
+        },
+        "share_links_revoked_by_ck": {
+          "name": "share_links_revoked_by_ck",
+          "value": "revoked_by IS NULL OR revoked_at IS NOT NULL"
+        },
+        "share_links_replaced_by_ck": {
+          "name": "share_links_replaced_by_ck",
+          "value": "replaced_by IS NULL OR revoke_reason = 'reissued'"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {
+    "app": "app"
+  },
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
