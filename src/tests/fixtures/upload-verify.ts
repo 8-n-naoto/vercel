@@ -45,3 +45,31 @@ export const UV_CASES: UvCase[] = [
   html('UV-20', cat(bytes(0x82, 0xa0), ascii('<meta charset="cp932">')), ok('shift_jis')),
   html('UV-21', ascii('<meta name="viewport" content="width=device-width">'), ok('utf-8')),
 ]
+
+// Additions outside 07 (T-018, F-003 proposal 6). X-marked IDs never collide with 07 IDs.
+export const UV_X_CASES: UvCase[] = [
+  html('UV-X01', bytes(0xfe, 0xff, 0x3c, 0x70), fail('binary')), // UTF-16BE BOM without a NUL byte
+  html('UV-X02', cat(bytes(0xef, 0xbb, 0xbf), ascii('<meta charset="shift_jis">')), ok('utf-8')), // BOM wins over meta
+  html('UV-X03', ascii('<p>' + ' '.repeat(4000) + '<meta charset="shift_j'), ok('utf-8')), // truncated label is unknown
+  u('UV-X04', -1, 'text/html', doc, fail('empty')),
+  u('UV-X05', Number.POSITIVE_INFINITY, 'text/html', doc, fail('too_large')),
+  u('UV-X06', 100, '', doc, fail('not_html')),
+  u('UV-X07', 100, 'text/html ;charset=utf-8', doc, ok('utf-8')),
+  u('UV-X08', 100, ' text/html', doc, ok('utf-8')),
+  u('UV-X09', 100, 'text/htmlx', doc, fail('not_html')),
+  u('UV-X10', 100, 'application/xhtml+xml', doc, fail('not_html')),
+  u('UV-X11', 1, 'text/html', ascii('a'), ok('utf-8')), // 1-byte head
+  u('UV-X12', 100, 'text/html', new Uint8Array(0), ok('utf-8')), // empty head with a positive size
+  u('UV-X13', 100, 'text/html', bytes(0xff), ok('utf-8')), // lone 0xFF is not a BOM
+  html('UV-X14', ascii('<meta charset="UTF-8">'), ok('utf-8')),
+  html('UV-X15', ascii("<meta charset='Shift_JIS'>"), ok('shift_jis')),
+]
+
+// Every label of CHARSET_LABELS (18) and its normalized value.
+export const LABEL_CASES: { id: string; label: string; expected: FileCharset }[] = [
+  ['utf-8', 'utf-8'], ['utf8', 'utf-8'], ['unicode-1-1-utf-8', 'utf-8'],
+  ['shift_jis', 'shift_jis'], ['shift-jis', 'shift_jis'], ['sjis', 'shift_jis'], ['x-sjis', 'shift_jis'], ['ms_kanji', 'shift_jis'],
+  ['csshiftjis', 'shift_jis'], ['windows-31j', 'shift_jis'], ['cp932', 'shift_jis'], ['ms932', 'shift_jis'],
+  ['euc-jp', 'euc-jp'], ['eucjp', 'euc-jp'], ['x-euc-jp', 'euc-jp'], ['cseucpkdfmtjapanese', 'euc-jp'],
+  ['iso-2022-jp', 'iso-2022-jp'], ['csiso2022jp', 'iso-2022-jp'],
+].map(([label, expected], i) => ({ id: 'UV-X' + String(16 + i), label: label as string, expected: expected as FileCharset }))

@@ -2,6 +2,7 @@
 import type { AccessInput, AccessDecision, AccessStage } from '@/server/authz/access-policy'
 import type { AccessPurpose, AccessVia, DenyReason } from '@/lib/domain'
 
+// 07 uses N = 2026-10-10T00:00:00Z; this fixture uses a different N. Every vector is relative to N, so results are identical.
 export const N = new Date('2026-10-08T03:00:00.000Z')
 const DAY = 86_400_000
 const MIN = 60_000
@@ -167,4 +168,26 @@ export const IN_CASES: InCase[] = [
   { id: 'IN-03', row: { revokedAt: null, expiresAt: N, maxViews: 1, viewCount: 1, dbNow: N }, expected: 'LINK_EXPIRED' },
   { id: 'IN-04', row: { revokedAt: null, expiresAt: at(DAY), maxViews: 3, viewCount: 3, dbNow: N }, expected: 'VIEW_LIMIT_REACHED' },
   { id: 'IN-05', row: { revokedAt: null, expiresAt: at(DAY), maxViews: null, viewCount: 9, dbNow: N }, expected: 'NOT_FOUND', unexplained: true },
+]
+
+// Additions outside 07 (T-018, F-003 proposal 5). X-marked IDs never collide with 07 IDs.
+const eaX = (id: string, via: Via, stage: Stg, purpose: Purp, over: Overrides, expected: AccessDecision): EaCase => ({
+  id, via, stage, purpose, over, expected,
+})
+export const EA_X_CASES: EaCase[] = [
+  // via=member ignores a revoked link (revoked version of EA-45)
+  eaX('EA-X01', 'M', 'I', 'V', { link: { revokedAt: at(-MIN) } }, allow(false, null)),
+  // passwordVerified=false is PASSWORD_INVALID for both view and download
+  eaX('EA-X02', 'S', 'I', 'DL', { link: { hasPassword: true }, passwordVerified: false }, deny('PASSWORD_INVALID')),
+  // precheck + download + password: needsPassword is reported, remainingViews stays null for download
+  eaX('EA-X03', 'S', 'P', 'DL', { link: { hasPassword: true, maxViews: 5, viewCount: 2 } }, allow(true, null)),
+  // admin_preview: a disabled viewer is rejected before the role check, and a disabled admin is rejected as well
+  eaX('EA-X04', 'A', 'I', 'V', { viewer: { role: 'user', disabledAt: at(-DAY) } }, deny('USER_DISABLED')),
+  // maxViews = 0 can never be viewed (06 forbids it at creation; stored data is treated as exhausted)
+  eaX('EA-X05', 'S', 'I', 'V', { link: { maxViews: 0, viewCount: 0 } }, deny('VIEW_LIMIT_REACHED')),
+  eaX('EA-X06', 'S', 'I', 'DL', { link: { maxViews: 0, viewCount: 0 } }, allow(false, null)),
+  // deliver with admin_preview and a deleted file
+  eaX('EA-X07', 'A', 'D', 'V', { viewer: ADMIN, file: { status: 'deleted' } }, deny('NOT_FOUND')),
+  // deliver does not re-check the password even when it was never verified
+  eaX('EA-X08', 'S', 'D', 'DL', { link: { hasPassword: true } }, allow(false, null)),
 ]

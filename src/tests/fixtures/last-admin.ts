@@ -23,3 +23,14 @@ export const LA_CASES: { id: string; input: AdminChangeInput; expected: AdminCha
   c('LA-09', B, adminDisabled, 'disable', [A], 'noop'),
   c('LA-10', B, adminDisabled, 'demote', [A], 'ok'),
 ]
+
+// Additions outside 07 (T-018, F-003 proposal 9). X-marked IDs never collide with 07 IDs.
+export const LA_X_CASES: typeof LA_CASES = [
+  // an enabled admin target that is missing from activeAdminIds (stale list) is not treated as the last admin
+  c('LA-X01', B, adm, 'disable', [A], 'ok'),
+  c('LA-X02', B, adm, 'demote', [A], 'ok'),
+  // the only active admin is the target and the list has one entry: last_admin for both operations
+  c('LA-X03', B, adm, 'demote', [B], 'last_admin'),
+  // self check wins over everything else, even for a missing target
+  c('LA-X04', A, null, 'disable', [], 'self'),
+]

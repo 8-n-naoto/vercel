@@ -16,3 +16,21 @@ export const KEY_CASES: { id: string; rule: RateLimitRuleName; parts: RateLimitP
   { id: 'RL-06', rule: 'share:ip', parts: { ip: null }, expected: 'share:ip:unknown' },
   { id: 'RL-07', rule: 'share-pw:link-ip', parts: { linkId: 'L', ip: '203.0.113.5' }, expected: 'share-pw:link-ip:L:203.0.113.5' },
 ]
+
+// Additions outside 07 (T-018, F-003 proposal 8). X-marked IDs never collide with 07 IDs.
+export const DECIDE_X_CASES: { id: string; count: number; limit: number; retry: number; expected: RateLimitDecision }[] = [
+  { id: 'RL-X01', count: 0, limit: 0, retry: 60, expected: { ok: true } },
+  { id: 'RL-X02', count: 1, limit: 0, retry: 60, expected: { ok: false, retryAfterSec: 60, writeAudit: true } },
+  { id: 'RL-X03', count: 2, limit: 0, retry: 60, expected: { ok: false, retryAfterSec: 60, writeAudit: false } },
+  { id: 'RL-X04', count: 6, limit: 5, retry: -30, expected: { ok: false, retryAfterSec: 1, writeAudit: true } },
+  { id: 'RL-X05', count: 6, limit: 5, retry: 0.5, expected: { ok: false, retryAfterSec: 1, writeAudit: true } },
+]
+
+export const KEY_X_CASES: { id: string; rule: RateLimitRuleName; parts: RateLimitParts; expected: string }[] = [
+  { id: 'RL-X06', rule: 'login:email', parts: { email: '' }, expected: 'login:email:' + sha256hex('') },
+  { id: 'RL-X07', rule: 'login:email', parts: {}, expected: 'login:email:' + sha256hex('') },
+  { id: 'RL-X08', rule: 'share:ip', parts: { ip: '2001:db8::1' }, expected: 'share:ip:2001:db8::1' },
+  { id: 'RL-X09', rule: 'share:ip', parts: {}, expected: 'share:ip:unknown' },
+  { id: 'RL-X10', rule: 'share-pw:link-ip', parts: { linkId: 'L', ip: null }, expected: 'share-pw:link-ip:L:unknown' },
+  { id: 'RL-X11', rule: 'mutation:user', parts: { userId: 'U' }, expected: 'mutation:user:U' },
+]

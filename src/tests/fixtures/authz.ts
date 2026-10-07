@@ -50,3 +50,20 @@ export const SS_CASES: { id: string; input: SessionInput; expected: 'ok' | 'UNAU
   { id: 'SS-10', input: { ...base(), nowMs: T_MS + 7 * DAY + 1 }, expected: 'UNAUTHENTICATED' },
   { id: 'SS-11', input: { ...base(), nowMs: T_MS - 1000 }, expected: 'ok' },
 ]
+
+// Additions outside 07 (T-018, F-003 proposal 3 and 4). X-marked IDs never collide with 07 IDs.
+export const FA_X_CASES: typeof FA_CASES = [
+  { id: 'FA-X01', role: 'admin', row: row(true, false), need: 'view', expected: ng('NOT_FOUND') },
+  { id: 'FA-X02', role: 'admin', row: row(true, true), need: 'manage', expected: ng('NOT_FOUND') },
+  { id: 'FA-X03', role: 'user', row: row(true, true), need: 'manage', expected: ng('NOT_FOUND') },
+  { id: 'FA-X04', role: 'user', row: row(true, false), need: 'manage', expected: ng('NOT_FOUND') },
+]
+
+export const SS_X_CASES: typeof SS_CASES = [
+  { id: 'SS-X01', input: { ...base(), authTimeSec: T_SEC + 0.5 }, expected: 'ok' }, // fractional auth_time
+  { id: 'SS-X02', input: { ...base(), authTimeSec: -1 }, expected: 'UNAUTHENTICATED' }, // negative auth_time is far older than any max age
+  { id: 'SS-X03', input: { ...base(), maxAgeDays: 0 }, expected: 'ok' }, // age 0 is not over a 0-day limit
+  { id: 'SS-X04', input: { ...base(), maxAgeDays: 0, nowMs: T_MS + 1 }, expected: 'UNAUTHENTICATED' },
+  { id: 'SS-X05', input: withProfile({ disabledAt: new Date(T_MS - DAY), sessionRevokedAt: new Date(T_MS - DAY) }), expected: 'UNAUTHENTICATED' },
+  { id: 'SS-X06', input: withProfile({ disabledAt: new Date(T_MS - DAY), sessionRevokedAt: new Date(T_MS + 500) }), expected: 'UNAUTHENTICATED' },
+]
