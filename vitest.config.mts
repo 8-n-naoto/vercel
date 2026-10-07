@@ -14,9 +14,7 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     exclude: ['node_modules/**', 'e2e/**', '.next/**', '_archive/**', 'src/tests/integration/**'], // integration tests: npm run test:integration (07 14)
-    // WP-0.2 enables this: src/tests/setup.ts (dummy env values) does not exist yet.
-    // setupFiles: ['src/tests/setup.ts'],
-    passWithNoTests: true, // WP-0.1: no tests yet. Remove when the first test lands (WP-0.3 authz-coverage).
+    setupFiles: ['src/tests/setup.ts'],
     coverage: { provider: 'v8', include: ['src/server/**', 'src/lib/**'], reporter: ['text-summary', 'lcov'] },
   },
 })
