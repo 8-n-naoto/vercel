@@ -28,6 +28,14 @@ describe('safeNextPath (open redirect)', () => {
   })
 })
 
+describe('safeNextPath shares the zNextPath rules (F-005)', () => {
+  it('rejects control characters (raw and percent-encoded) and encoded backslashes', () => {
+    for (const p of ['/\t/evil.example', '/\n/evil.example', '/\r/evil.example', '/%09/evil.example', '/%0a/evil.example', '/%5c%5cevil', '/\u0000']) {
+      expect(safeNextPath(p), JSON.stringify(p)).toBeNull()
+    }
+  })
+})
+
 describe('loginRedirectPath (02 2.6 step 6)', () => {
   it('signed out on an app page -> /login?next=<path+query encoded>', () => {
     expect(loginRedirectPath(req('/folders/abc?tab=files'), false)).toBe('/login?next=%2Ffolders%2Fabc%3Ftab%3Dfiles')

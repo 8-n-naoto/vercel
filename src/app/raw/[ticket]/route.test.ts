@@ -3,7 +3,8 @@ import { NextRequest } from 'next/server'
 import { ROUTE_BRAND } from '@/server/http/brand'
 import * as rateLimit from '@/server/security/rate-limit'
 import * as routeModule from './route'
-import { GET } from './route'
+import { GET, HEAD } from './route'
+import { getDb } from '@/server/db/client'
 
 vi.mock('@/server/security/request-meta', () => ({
   getRequestMeta: async () => ({ ip: '203.0.113.9', userAgent: 'vitest', requestId: 'req-raw' }),
@@ -24,12 +25,25 @@ beforeEach(() => {
 })
 
 describe('GET /raw/[ticket] route definition (06 10.1)', () => {
-  it('is defineRoute(raw.get, ticket, content) and exports GET only (no HEAD / POST), with the runtime settings', () => {
+  it('is defineRoute(raw.get, ticket, content) and exports GET and an explicit HEAD 405 (no POST), with the runtime settings', () => {
     expect(GET[ROUTE_BRAND]).toEqual({ name: 'raw.get', auth: 'ticket', host: 'content' })
-    expect(Object.keys(routeModule).sort()).toEqual(['GET', 'dynamic', 'maxDuration', 'runtime'])
+    expect(Object.keys(routeModule).sort()).toEqual(['GET', 'HEAD', 'dynamic', 'maxDuration', 'runtime'])
     expect(routeModule.dynamic).toBe('force-dynamic')
     expect(routeModule.runtime).toBe('nodejs')
     expect(routeModule.maxDuration).toBe(300)
+  })
+
+  it('HEAD answers 405 with Allow: GET and the raw error headers, and never touches rate limit or DB (F-008)', async () => {
+    const r = await HEAD(new NextRequest(`http://127.0.0.1:3000/raw/${TICKET}`, { method: 'HEAD', headers: { host: '127.0.0.1:3000' } }), {
+      params: Promise.resolve({ ticket: TICKET }),
+    })
+    expect(r.status).toBe(405)
+    expect(r.headers.get('allow')).toBe('GET')
+    expect(r.headers.get('cache-control')).toBe('no-store')
+    expect(r.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(r.headers.get('x-robots-tag')).toBe('noindex, nofollow, noarchive')
+    expect(rateLimit.consumeRateLimit).not.toHaveBeenCalled()
+    expect(getDb).not.toHaveBeenCalled()
   })
 
   it('the app host answers 404 (Host check), without rate limiting or any lookup', async () => {
@@ -53,5 +67,8 @@ describe('GET /raw/[ticket] route definition (06 10.1)', () => {
     const r = await call('127.0.0.1:3000', TICKET)
     expect(r.status).toBe(429)
     expect(r.headers.get('retry-after')).toBe('9')
+    expect(r.headers.get('cache-control')).toBe('no-store')
+    expect(r.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(r.headers.get('x-robots-tag')).toBe('noindex, nofollow, noarchive')
   })
 })

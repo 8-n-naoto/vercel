@@ -20,10 +20,25 @@ export const zIsoDateTime = z.iso.datetime({ offset: true })
 export const zNullableIsoDateTime = zIsoDateTime.nullable()
 export const zUserRole = z.enum(USER_ROLES)
 export const zCharset = z.enum(FILE_CHARSETS)
-export const zNextPath = z
-  .string()
-  .max(2048)
-  .refine((p) => p.startsWith('/') && !p.startsWith('//') && !p.startsWith('/\\'), 'invalid_next')
+const NEXT_BASE = 'http://next-path.invalid'
+// Raw control characters (U+0000-U+001F, U+007F) and backslash, plus the percent-encoded forms of control characters (%00-%1F, %7F) and backslash (%5C).
+const NEXT_FORBIDDEN = /[\u0000-\u001f\u007f\\]|%(?:[01][0-9a-f]|7f|5c)/i
+
+/**
+ * A same-site absolute path usable as a post-login redirect target (02 appendix A T14, F-005).
+ * Browsers strip tab / LF / CR from URLs, so "/<TAB>/evil.example" would become "//evil.example": control characters and backslashes are rejected
+ * anywhere in the value, and the value must resolve to the same origin.
+ */
+export function isSafeNextPath(p: string): boolean {
+  if (p.length > 2048 || !p.startsWith('/') || p.startsWith('//') || NEXT_FORBIDDEN.test(p)) return false
+  try {
+    return new URL(p, NEXT_BASE).origin === NEXT_BASE
+  } catch {
+    return false
+  }
+}
+
+export const zNextPath = z.string().max(2048).refine(isSafeNextPath, 'invalid_next')
 export const zPage = z.object({
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(100).default(50),

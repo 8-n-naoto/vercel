@@ -46,6 +46,26 @@ describe('other common parts', () => {
     expect(zNextPath.safeParse('/folders').success).toBe(true)
     for (const bad of ['//evil.example', '/\\evil', 'https://evil.example', 'folders']) expect(zNextPath.safeParse(bad).success).toBe(false)
   })
+  it('zNextPath rejects control characters, backslashes and off-origin results anywhere in the value (F-005)', () => {
+    const bad = [
+      '/\t/evil.example', // browsers strip tab / LF / CR from URLs, turning this into //evil.example
+      '/\n/evil.example',
+      '/\r/evil.example',
+      '/\u0000x',
+      '/a\u007fb',
+      '/a\\b',
+      '/\t\t/evil.example',
+      '/%09/evil.example',
+      '/%0a/evil.example',
+      '/%0D/evil.example',
+      '/%5c%5cevil',
+      '/%5Cevil',
+      '/%00',
+      '/%7f',
+    ]
+    for (const p of bad) expect(zNextPath.safeParse(p).success, JSON.stringify(p)).toBe(false)
+    for (const ok of ['/', '/folders/1?x=%20y', '/s/abc#top', '/a%2Fb']) expect(zNextPath.safeParse(ok).success, ok).toBe(true)
+  })
   it('zPage defaults and bounds', () => {
     expect(zPage.parse({})).toEqual({ page: 1, pageSize: 50 })
     expect(zPage.safeParse({ page: 0 }).success).toBe(false)

@@ -109,7 +109,7 @@ export function downloadResponseHeaders(originalFilename: string): Record<string
   }
 }
 
-/** 404 / 403 / 502 of /raw: fixed English body, no hint of the file's existence (06 10.1). */
+/** 404 / 403 / 405 / 429 / 500 / 502 of /raw: fixed English body, no hint of the file's existence (06 10.1). */
 export function rawErrorHeaders(): Record<string, string> {
   return {
     'Content-Type': 'text/plain; charset=utf-8',

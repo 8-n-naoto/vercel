@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import type { RateLimitRule, ServiceContext } from '@/server/actions/define-action'
 import { getConfig } from '@/server/config'
 import { ROUTE_BRAND } from '@/server/http/brand'
+import { rawErrorHeaders } from '@/server/security/headers'
 import { consumeRateLimit } from '@/server/security/rate-limit'
 import { getRequestMeta } from '@/server/security/request-meta'
 
@@ -29,13 +30,16 @@ export function defineRoute<P>(def: RouteDef<P>) {
     throw new Error(`defineRoute(${def.name}): auth '${def.auth}' requires at least one rateLimit rule (06 3.2)`)
   }
 
+  // Content-origin routes also send the no-store / noindex / nosniff headers on 404 / 429 / 500 (06 10.1, F-007).
+  const errorHeaders: Record<string, string> = def.host === 'content' ? rawErrorHeaders() : {}
+
   const run = async (req: NextRequest, segment: { params: Promise<P> }): Promise<Response> => {
     const requestMeta = await getRequestMeta()
     try {
       const cfg = getConfig()
       // 1. Host
       const expectedHost = new URL(def.host === 'app' ? cfg.APP_ORIGIN : cfg.CONTENT_ORIGIN).host
-      if (req.headers.get('host') !== expectedHost) return new NextResponse(null, { status: 404 })
+      if (req.headers.get('host') !== expectedHost) return new NextResponse(null, { status: 404, headers: errorHeaders })
 
       // 2. cron: Bearer CRON_SECRET (D-015 / D-018 (i): unauthenticated is 401, not 404)
       if (def.auth === 'cron' && !bearerMatches(req.headers.get('authorization'), cfg.CRON_SECRET)) {
@@ -49,7 +53,7 @@ export function defineRoute<P>(def: RouteDef<P>) {
         const key = rule.key(ctx, params)
         if (key === null) continue
         const r = await consumeRateLimit({ name: rule.name, key, limit: rule.limit, windowSec: rule.windowSec }, ctx)
-        if (!r.ok) return new NextResponse(null, { status: 429, headers: { 'Retry-After': String(r.retryAfterSec) } })
+        if (!r.ok) return new NextResponse(null, { status: 429, headers: { ...errorHeaders, 'Retry-After': String(r.retryAfterSec) } })
       }
 
       // 4. handler
@@ -66,7 +70,7 @@ export function defineRoute<P>(def: RouteDef<P>) {
           stack: e instanceof Error ? e.stack : undefined,
         }),
       )
-      return NextResponse.json({ ok: false }, { status: 500 })
+      return NextResponse.json({ ok: false }, { status: 500, headers: errorHeaders })
     }
   }
   return Object.assign(run, { [ROUTE_BRAND]: { name: def.name, auth: def.auth, host: def.host } })

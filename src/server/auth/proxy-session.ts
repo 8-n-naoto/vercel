@@ -2,6 +2,7 @@
 // every page and action still calls requireUser / requireAdmin.
 import 'server-only'
 import type { NextRequest } from 'next/server'
+import { isSafeNextPath } from '@/lib/schemas/common'
 import { PUBLIC_PAGES } from '@/server/page-registry'
 import { authCookieBaseName, createSupabaseProxyClient, isAuthCookieName, type PendingCookie } from '@/server/auth/supabase-server'
 
@@ -36,10 +37,9 @@ export function isPublicPath(pathname: string): boolean {
   return p.startsWith('/api/') || PUBLIC_PATTERNS.some((re) => re.test(p))
 }
 
-/** `next` must be a relative path: starts with a single "/", no "//" and no backslash (open redirect, 02 5.1.3). */
+/** `next` must be a same-site relative path; the rules are shared with zNextPath (open redirect, 02 5.1.3, F-005). */
 export function safeNextPath(path: string): string | null {
-  if (path.length > 2048 || !path.startsWith('/') || path.startsWith('//') || path.includes('\\')) return null
-  return path
+  return isSafeNextPath(path) ? path : null
 }
 
 /**

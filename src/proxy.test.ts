@@ -46,6 +46,16 @@ describe('proxy host routing (02 2.6, 04 8.2 #3-#6)', () => {
     expect(res.headers.get('X-Frame-Options')).toBeNull()
   })
 
+  it('content origin 404 carries the raw error headers (F-007)', async () => {
+    for (const path of ['/', '/login', '/api/health']) {
+      const res = await call('127.0.0.1:3000', path)
+      expect(res.status).toBe(404)
+      expect(res.headers.get('Cache-Control')).toBe('no-store')
+      expect(res.headers.get('X-Robots-Tag')).toBe('noindex, nofollow, noarchive')
+      expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff')
+    }
+  })
+
   it('matcher excludes only static assets (not /api)', async () => {
     const re = new RegExp(`^${config.matcher[0]}$`)
     expect(re.test('/api/health')).toBe(true)

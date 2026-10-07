@@ -3,7 +3,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { loginRedirectPath, refreshSession } from '@/server/auth/proxy-session'
 import { getConfig } from '@/server/config'
-import { appSecurityHeaders } from '@/server/security/headers'
+import { appSecurityHeaders, rawErrorHeaders } from '@/server/security/headers'
 
 function notFound(): NextResponse {
   return new NextResponse(null, { status: 404 })
@@ -21,7 +21,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   // 2. Content origin: only /raw/ is served. No auth processing, no app headers (the route sets its own).
   if (host === contentHost) {
-    if (!path.startsWith('/raw/')) return notFound()
+    if (!path.startsWith('/raw/')) return new NextResponse(null, { status: 404, headers: rawErrorHeaders() })
     return NextResponse.next()
   }
 

@@ -115,3 +115,41 @@ describe('bearerMatches', () => {
     expect(bearerMatches(null, 'abc')).toBe(false)
   })
 })
+
+describe('defineRoute error headers on the content origin (F-007, 06 10.1)', () => {
+  const expectRawErrorHeaders = (res: Response) => {
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    expect(res.headers.get('x-robots-tag')).toBe('noindex, nofollow, noarchive')
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff')
+  }
+  const content = (handler: () => Promise<Response>) =>
+    defineRoute<{ ticket: string }>({
+      name: 'raw.test',
+      auth: 'ticket',
+      host: 'content',
+      rateLimit: [{ name: 'raw:ip', key: () => 'ip', limit: 1, windowSec: 1 }],
+      handler,
+    })
+  const p = { params: Promise.resolve({ ticket: 't' }) }
+
+  it('404 (host mismatch), 429 and 500 carry the raw error headers; 429 keeps Retry-After', async () => {
+    const r = content(async () => {
+      throw new Error('boom')
+    })
+    expectRawErrorHeaders(await r(req('localhost:3000'), p))
+    vi.mocked(rateLimit.consumeRateLimit).mockResolvedValueOnce({ ok: false, retryAfterSec: 7 })
+    const limited = await r(req('127.0.0.1:3000'), p)
+    expect(limited.status).toBe(429)
+    expect(limited.headers.get('retry-after')).toBe('7')
+    expectRawErrorHeaders(limited)
+    const failed = await r(req('127.0.0.1:3000'), p)
+    expect(failed.status).toBe(500)
+    expectRawErrorHeaders(failed)
+    expect(await failed.json()).toEqual({ ok: false })
+  })
+
+  it('app-origin routes do not get the raw error headers', async () => {
+    const res = await cron()(req('localhost:3000'), { params: none })
+    expect(res.headers.get('x-robots-tag')).toBeNull()
+  })
+})
