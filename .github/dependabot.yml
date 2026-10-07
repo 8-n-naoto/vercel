@@ -1,0 +1,47 @@
+# Dependabot version updates (F-011 / Q-29, 02 section 9 and appendix A T13).
+# Takes effect only after this file is pushed to the default branch (main).
+# Security updates (PRs for advisories) are separate and are enabled in the repository settings (HUMAN-TODO #2).
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    groups:
+      # Security-sensitive stacks: one PR each so that they can be applied within a week.
+      nextjs:
+        patterns:
+          - "next"
+          - "eslint-config-next"
+          - "@next/*"
+      supabase:
+        patterns:
+          - "@supabase/*"
+      # Everything else: minor and patch together (production and development dependencies).
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    # Major updates arrive as individual PRs (not grouped) and need human review.
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+    groups:
+      actions:
+        update-types:
+          - "minor"
+          - "patch"
