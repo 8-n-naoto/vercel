@@ -3,13 +3,15 @@
 import type { OpenAsMemberResult } from '@/lib/dto'
 import { viewOpenAsMemberInput, viewRequestMemberDownloadInput } from '@/lib/schemas/view'
 import { defineAction } from '@/server/actions/define-action'
+import { rateLimitKey } from '@/server/security/rate-limit'
 import { viewService } from '@/server/services/view'
 
 export const viewOpenAsMember = defineAction({
   name: 'view.openAsMember',
   auth: 'user',
   input: viewOpenAsMemberInput,
-  rateLimit: [],
+  // Q-28 / D-022: ticket issuing is limited to 30 per 60 s per user (06 3.5). view.requestMemberDownload is not covered yet (Q-33).
+  rateLimit: [{ name: 'ticket:user', key: (ctx) => (ctx.actor ? rateLimitKey('ticket:user', { userId: ctx.actor.userId }) : null), limit: 30, windowSec: 60 }],
   handler: async (ctx, input): Promise<OpenAsMemberResult> => viewService.openAsMember(ctx, input),
 })
 

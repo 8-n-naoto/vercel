@@ -2,7 +2,7 @@ import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { AppError } from '@/lib/errors'
 import { recordStandalone } from '@/server/services/audit'
 import { incrementRateLimit } from '@/server/services/rate-limit-store'
-import { consumeRateLimit, decideRateLimit, rateLimitKey } from './rate-limit'
+import { consumeRateLimit, decideRateLimit, rateLimitIpPart, rateLimitKey } from './rate-limit'
 import { DECIDE_CASES, DECIDE_X_CASES, KEY_CASES, KEY_X_CASES } from '@/tests/fixtures/rate-limit'
 import { itCoversSpec07 } from '@/tests/helpers/spec07'
 
@@ -10,7 +10,8 @@ vi.mock('@/server/services/rate-limit-store', () => ({ incrementRateLimit: vi.fn
 vi.mock('@/server/services/audit', () => ({ recordStandalone: vi.fn() }))
 
 describe('07 5.2 coverage', () => {
-  itCoversSpec07('RL', [...DECIDE_CASES, ...KEY_CASES].map((c) => c.id), { integrationFrom: 8 })
+  // RL-29 lives in src/app/_actions/view.test.ts; RL-08..11 and RL-30 are integration rows and are excluded by the helper.
+  itCoversSpec07('RL', [...DECIDE_CASES, ...KEY_CASES].map((c) => c.id).concat('RL-29'))
 })
 
 describe('decideRateLimit (07 5.2)', () => {
@@ -22,6 +23,35 @@ describe('decideRateLimit (07 5.2)', () => {
 describe('rateLimitKey (07 5.2)', () => {
   it.each(KEY_CASES)('$id', ({ rule, parts, expected }) => {
     expect(rateLimitKey(rule, parts)).toBe(expected)
+  })
+})
+
+describe('rateLimitIpPart (06 3.5, D-021)', () => {
+  it.each([
+    ['203.0.113.5', '203.0.113.5'],
+    ['2001:db8::1', '2001:db8:0:0::/64'],
+    ['::ffff:203.0.113.5', '203.0.113.5'],
+    ['::ffff:cb00:7105', '203.0.113.5'],
+    ['::', '0:0:0:0::/64'],
+    ['fe80::1%eth0', 'unknown'],
+    ['', 'unknown'],
+    ['  ', 'unknown'],
+  ])('%s -> %s', (ip, expected) => {
+    expect(rateLimitIpPart(ip)).toBe(expected)
+  })
+  it('an odd IPv4 form accepted by isIP is returned as is (/32) or unknown, never rounded', () => {
+    expect(['01.2.3.4', 'unknown']).toContain(rateLimitIpPart('01.2.3.4'))
+  })
+  it('null / undefined -> unknown; surrounding spaces are trimmed', () => {
+    expect(rateLimitIpPart(null)).toBe('unknown')
+    expect(rateLimitIpPart(undefined)).toBe('unknown')
+    expect(rateLimitIpPart(' 2001:db8::1 ')).toBe('2001:db8:0:0::/64')
+  })
+  it('every ip-bearing rule goes through it (login:ip, token:ip, share:ip, share-pw:link-ip, raw:ip)', () => {
+    for (const rule of ['login:ip', 'token:ip', 'share:ip', 'raw:ip'] as const) {
+      expect(rateLimitKey(rule, { ip: '2001:db8::9' })).toBe(`${rule}:2001:db8:0:0::/64`)
+    }
+    expect(rateLimitKey('share-pw:link-ip', { linkId: 'L', ip: '2001:db8::9' })).toBe('share-pw:link-ip:L:2001:db8:0:0::/64')
   })
 })
 

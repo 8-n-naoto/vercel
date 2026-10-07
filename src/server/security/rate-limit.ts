@@ -1,6 +1,7 @@
 // Rate limiting (06 3.5, 07 5): pure helpers of 07 5.1 plus consumeRateLimit (UPSERT, fail-closed).
 import 'server-only'
 import { createHash } from 'node:crypto'
+import { isIP } from 'node:net'
 import { appError } from '@/lib/errors'
 import type { ServiceContext } from '@/server/actions/define-action'
 import { recordStandalone } from '@/server/services/audit'
@@ -15,6 +16,7 @@ export type RateLimitRuleName =
   | 'share-pw:link-ip'
   | 'raw:ip'
   | 'mutation:user'
+  | 'ticket:user'
 
 export interface RateLimitParts {
   email?: string
@@ -36,9 +38,52 @@ export function decideRateLimit(count: number, limit: number, retryAfter: number
 
 const sha256hex = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex')
 
-/** Key layout of 06 3.5. A null or missing ip becomes 'unknown'. Emails are hashed so the key holds no address. */
+// isIP() === 6 has already validated the string, so this only needs to handle the valid grammar. Returns 8 groups (0..0xffff).
+function expandIPv6(s: string): number[] {
+  const toGroups = (part: string): number[] => {
+    if (part === '') return []
+    const out: number[] = []
+    for (const g of part.split(':')) {
+      if (g.includes('.')) {
+        const [a = 0, b = 0, c = 0, d = 0] = g.split('.').map(Number)
+        out.push((a << 8) | b, (c << 8) | d)
+      } else {
+        out.push(parseInt(g, 16))
+      }
+    }
+    return out
+  }
+  const idx = s.indexOf('::')
+  if (idx < 0) return toGroups(s)
+  const head = toGroups(s.slice(0, idx))
+  const tail = toGroups(s.slice(idx + 2))
+  return [...head, ...new Array<number>(Math.max(0, 8 - head.length - tail.length)).fill(0), ...tail]
+}
+
+/**
+ * The ip part of rate-limit keys (06 3.5, D-021). IPv4 stays /32; IPv6 is rounded to its /64 ("a:b:c:d::/64", lowercase, no leading zeros);
+ * an IPv4-mapped IPv6 address is treated as IPv4. Empty, whitespace-only, zone-id and non-IP values become 'unknown'.
+ * Only the key is rounded: request meta, access logs and audit logs keep the raw ip.
+ */
+export function rateLimitIpPart(ip: string | null | undefined): string {
+  const s = (ip ?? '').trim()
+  if (s === '' || s.includes('%')) return 'unknown'
+  const v = isIP(s)
+  if (v === 4) return s // /32 as is (even if isIP accepts an odd form)
+  if (v !== 6) return 'unknown'
+  const h = expandIPv6(s)
+  if (h.length !== 8) return 'unknown'
+  if (h.slice(0, 5).every((x) => x === 0) && h[5] === 0xffff) {
+    const hi = h[6] ?? 0
+    const lo = h[7] ?? 0
+    return `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`
+  }
+  return `${h.slice(0, 4).map((x) => x.toString(16)).join(':')}::/64`
+}
+
+/** Key layout of 06 3.5. The ip part goes through rateLimitIpPart. Emails are hashed so the key holds no address. */
 export function rateLimitKey(rule: RateLimitRuleName, parts: RateLimitParts): string {
-  const ip = parts.ip?.trim() || 'unknown' // null, undefined, empty and whitespace-only all become 'unknown' (D-020)
+  const ip = rateLimitIpPart(parts.ip)
   switch (rule) {
     case 'login:email':
       return `${rule}:${sha256hex((parts.email ?? '').trim().toLowerCase())}`
@@ -52,6 +97,7 @@ export function rateLimitKey(rule: RateLimitRuleName, parts: RateLimitParts): st
     case 'share-pw:link-ip':
       return `${rule}:${parts.linkId ?? ''}:${ip}`
     case 'mutation:user':
+    case 'ticket:user':
       return `${rule}:${parts.userId ?? ''}`
   }
 }

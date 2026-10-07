@@ -10,10 +10,10 @@ import { deleteRateLimitsByKeyPrefix } from '@/server/repositories/rate-limits'
 import { rateLimitKey } from '@/server/security/rate-limit'
 import { jar } from './auth-fixture'
 
-/** A unique documentation-range IPv6 address, so that login:ip / token:ip counters never collide between runs or tests. */
+/** A unique documentation-range IPv6 address. The /64 part varies because rate-limit keys round IPv6 to /64 (D-021), so counters never collide between runs or tests. */
 export function uniqueIp(): string {
   const h = randomBytes(4).toString('hex')
-  return `2001:db8::${h.slice(0, 4)}:${h.slice(4)}`
+  return `2001:db8:${h.slice(0, 4)}:${h.slice(4)}::1`
 }
 
 /** Makes getRequestMeta() (next/headers mock) see this client IP. */
