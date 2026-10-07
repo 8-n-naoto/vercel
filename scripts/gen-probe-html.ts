@@ -87,6 +87,14 @@ const PROBE_HTML = `<!doctype html>
   img.onload = function () { report('image', 'LOADED'); };
   img.onerror = function () { report('image', 'blocked (error event)'); };
   img.src = 'https://example.invalid/pixel.gif';
+
+  // 7. localStorage. Under sandbox="allow-scripts" (opaque origin) access throws SecurityError.
+  try {
+    window.localStorage.setItem('probe', '1');
+    report('storage', 'READABLE');
+  } catch (e) {
+    report('storage', 'blocked (' + errName(e) + ')');
+  }
 })();
 </script>
 </body>

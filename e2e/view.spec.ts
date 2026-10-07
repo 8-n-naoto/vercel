@@ -2,10 +2,11 @@
 // WP-4.x (upload), WP-5.1 (tickets) and WP-5.2 (/raw/[ticket] delivery on CONTENT_ORIGIN), so it is skipped unless
 //   E2E_DB=1  and  SEED_PASSWORD is set, and E2E_VIEW=1 (set after WP-5.2 lands).
 // NOT RUN in WP-5.3 (no DB / Supabase connection from the implementation environment). Selectors follow the components; adjust on the first real
-// run and record it in 10. S08-6 (exactly one granted log row) is checked on the S05 access log tab, which arrives with WP-5.5: held as fixme.
+// run and record it in 10. S08-6 (exactly one granted log row) is checked on the S05 access log tab (WP-5.5).
+// WP-5.6 additions: S08-2b (localStorage / fetch from the frame), S08-7 (no Cookie header on /raw requests), T2 (a removed member gets 404).
 // Residue: the tests create a folder named `e2e-<runId>-view`; the last test deletes it, but a failed run leaves it (see docs/runbook.md section 10).
 import { randomBytes } from 'node:crypto'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Browser, type Page } from '@playwright/test'
 import { SEED_USERS } from '../scripts/seed-lib'
 
 const RUN = process.env.E2E_DB === '1' && process.env.E2E_VIEW === '1' && !!process.env.SEED_PASSWORD
@@ -43,6 +44,7 @@ test.describe('viewer flow (needs DB, seed, WP-5.1 and WP-5.2)', () => {
 
   let folderUrl = ''
   let viewUrl = ''
+  let fileId = ''
 
   test('setup: admin creates a folder, adds the member and uploads probe.html', async ({ page }) => {
     await signIn(page, ADMIN.email)
@@ -62,7 +64,7 @@ test.describe('viewer flow (needs DB, seed, WP-5.1 and WP-5.2)', () => {
     await page.getByLabel('表示名').fill(fileTitle)
     await page.getByRole('button', { name: 'アップロード', exact: true }).click()
     await expect(page).toHaveURL(/\/folders\/[0-9a-f-]{36}\/files\/[0-9a-f-]{36}\?uploaded=1$/, { timeout: 60_000 })
-    const fileId = /\/files\/([0-9a-f-]{36})/.exec(page.url())?.[1]
+    fileId = /\/files\/([0-9a-f-]{36})/.exec(page.url())?.[1] ?? ''
     expect(fileId).toBeTruthy()
     viewUrl = `/view/${fileId}`
   })
@@ -92,6 +94,28 @@ test.describe('viewer flow (needs DB, seed, WP-5.1 and WP-5.2)', () => {
     await expect(inner.locator('#probe-open')).toContainText('blocked')
     expect(popups).toBe(0)
     expect(new URL(page.url()).pathname).toBe(viewUrl) // top was not navigated by the frame
+  })
+
+  test('S08-2b the frame cannot use localStorage or reach an external fetch (02 10 phase 4 (4))', async ({ page }) => {
+    await signIn(page, MEMBER.email)
+    await page.goto(viewUrl)
+    const inner = page.frameLocator('iframe')
+    await expect(inner.locator('#probe-storage')).toContainText('blocked')
+    await expect(inner.locator('#probe-storage')).not.toContainText('READABLE')
+    await expect(inner.locator('#probe-fetch')).toContainText('blocked')
+    expect(new URL(page.url()).pathname).toBe(viewUrl)
+  })
+
+  test('S08-7 the /raw request carries no Cookie header (02 10 phase 4 (3))', async ({ page }) => {
+    await signIn(page, MEMBER.email)
+    const raw: Array<Record<string, string>> = []
+    page.on('request', (req) => {
+      if (new URL(req.url()).pathname.startsWith('/raw/')) void req.allHeaders().then((h) => raw.push(h))
+    })
+    await page.goto(viewUrl)
+    await expect(page.frameLocator('iframe').locator('h1')).toBeVisible()
+    await expect.poll(() => raw.length).toBeGreaterThan(0)
+    for (const h of raw) expect(Object.keys(h).map((k) => k.toLowerCase())).not.toContain('cookie')
   })
 
   test('S08-3 suspended: the member sees 現在、公開が停止されています instead of the iframe', async ({ page, browser }) => {
@@ -143,8 +167,60 @@ test.describe('viewer flow (needs DB, seed, WP-5.1 and WP-5.2)', () => {
     expect(new URL(page.url()).pathname).toBe(viewUrl)
   })
 
-  test.fixme('S08-6 one visit records exactly one granted row, and hovering [開く] records none (checked on the S05 log tab, WP-5.5)', async () => {
-    // Implemented with WP-5.5 (access log tab).
+  // S08-6 / T2 use two browser contexts so that the admin and the member sessions do not collide.
+  async function grantedViewRows(browser: Browser): Promise<number> {
+    const admin = ADMIN
+    if (!admin) throw new Error('no admin seed user')
+    const ctx = await browser.newContext()
+    const p = await ctx.newPage()
+    await signIn(p, admin.email)
+    await p.goto(`${folderUrl}?tab=logs&period=all&result=granted&via=member&file=${fileId}`)
+    await expect(p.getByRole('table').or(p.getByText('この条件の閲覧ログはありません'))).toBeVisible()
+    const n = await p.getByRole('row').filter({ hasText: fileTitle }).filter({ hasText: '閲覧' }).count()
+    await ctx.close()
+    return n
+  }
+
+  test('S08-6 one visit records exactly one granted row, and hovering [開く] records none (checked on the S05 log tab)', async ({ browser }) => {
+    const before = await grantedViewRows(browser)
+    const ctx = await browser.newContext()
+    const m = await ctx.newPage()
+    await signIn(m, MEMBER.email)
+    await m.goto(folderUrl)
+    await m.getByRole('link', { name: '開く' }).first().hover()
+    await m.waitForTimeout(1000) // prefetch window
+    expect(await grantedViewRows(browser)).toBe(before)
+    await m.goto(viewUrl)
+    await expect(m.locator('iframe')).toHaveCount(1)
+    await m.waitForTimeout(1000)
+    await ctx.close()
+    expect(await grantedViewRows(browser)).toBe(before + 1)
+  })
+
+  test('T2 after the admin removes the member, S08 / S07 are 404 and an already issued /raw URL is 404 (02 appendix A)', async ({ browser }) => {
+    const mctx = await browser.newContext()
+    const m = await mctx.newPage()
+    await signIn(m, MEMBER.email)
+    await m.route('**/raw/**', (r) => r.abort()) // keep the ticket unconsumed so that the removal is what makes it fail
+    await m.goto(viewUrl)
+    await expect(m.locator('iframe')).toHaveCount(1)
+    const rawUrl = (await m.locator('iframe').getAttribute('src')) ?? ''
+    expect(rawUrl).toMatch(/\/raw\//)
+    await m.unroute('**/raw/**')
+
+    const actx = await browser.newContext()
+    const a = await actx.newPage()
+    await signIn(a, ADMIN.email)
+    await a.goto(`${folderUrl}?tab=members`)
+    await a.getByRole('row', { name: new RegExp(MEMBER.email) }).getByRole('button', { name: '外す' }).click()
+    await a.getByRole('dialog').getByRole('button', { name: '外す', exact: true }).click()
+    await expect(a.getByRole('row', { name: new RegExp(MEMBER.email) })).toHaveCount(0)
+    await actx.close()
+
+    expect((await mctx.request.get(rawUrl)).status()).toBe(404)
+    expect((await m.goto(viewUrl))?.status()).toBe(404)
+    expect((await m.goto(folderUrl))?.status()).toBe(404)
+    await mctx.close()
   })
 
   test('cleanup: admin deletes the folder', async ({ page }) => {

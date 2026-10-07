@@ -87,7 +87,7 @@ describe.skipIf(!dbUp)('authorization matrix over every user / admin action (07 
 
 // 02 10 phase 2 (2) / 07 13.3 AZ-02: the folder and member Actions are admin-only. The loops above expand over every registered Action,
 // so this guard fails if one of them is ever registered with a weaker auth (or disappears from the matrix).
-// AZ-03 / AZ-04 (view.*) belong to phase 5 and are not covered here.
+// AZ-03 / AZ-04 (view.*) are in integration/view.test.ts (see the view.* guard below).
 describe.skipIf(!dbUp)('folders.* / members.* are in the matrix as admin-only (WP-3.5)', () => {
   for (const name of ['folders.create', 'folders.update', 'folders.delete', 'members.add', 'members.remove']) {
     it(`${name} is registered with auth: admin (AZ-01 / 02 / 05 / 06 run for it above)`, () => {
@@ -110,4 +110,16 @@ describe.skipIf(!dbUp)('files.* are in the matrix as admin-only (WP-4.7)', () =>
     const a = adminOnly.find((x) => x.name === 'files.startUpload')
     expect(await a?.run(AZ_INPUTS['files.startUpload'])).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
   })
+})
+
+// 02 10 phase 4 / 07 13.3 AZ-03 / AZ-04: the two viewing Actions are auth: 'user' (any signed-in user; the folder membership is checked inside the
+// service), so they are NOT in the admin-only AZ-02 loop. AZ-01 / 05 / 06 run for them above. AZ-03 (a non-member gets NOT_FOUND view.not_found) and
+// AZ-04 (a member gets a ticket) are in integration/view.test.ts. This guard fails if one of them is registered with another auth or disappears.
+describe.skipIf(!dbUp)('view.* are in the matrix as auth: user (WP-5.6)', () => {
+  for (const name of ['view.openAsMember', 'view.requestMemberDownload']) {
+    it(`${name} is registered with auth: user (AZ-01 / 05 / 06 run for it above; AZ-03 / AZ-04 are in view.test.ts)`, () => {
+      expect(guarded.filter((a) => a.auth === 'user').map((a) => a.name)).toContain(name)
+      expect(adminOnly.map((a) => a.name)).not.toContain(name)
+    })
+  }
 })
