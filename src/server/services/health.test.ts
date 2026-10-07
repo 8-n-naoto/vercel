@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const pingDb = vi.fn<() => Promise<void>>()
-vi.mock('@/server/db/client', () => ({ pingDb: () => pingDb() }))
+vi.mock('@/server/db/client', () => ({
+  pingDb: () => pingDb(),
+  getDb: () => {
+    throw new Error('no database in this test') // WP-4.3 steps 2-4 reach for the database; each fails inside its own try/catch
+  },
+}))
 vi.mock('@/server/security/request-meta', () => ({
   getRequestMeta: async () => ({ ip: '127.0.0.1', userAgent: 'vitest', requestId: 'req-health' }),
 }))
@@ -80,8 +85,9 @@ describe('GET /api/cron/daily (06 10.2)', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)
-    expect(body.results).toHaveLength(1)
+    expect(body.results.map((r: { step: string }) => r.step)).toEqual(['keepalive', 'pending_cleanup', 'expired_files', 'purge_retry'])
     expect(body.results[0]).toMatchObject({ step: 'keepalive', processed: 1, failed: 0 })
+    expect(body.results[1]).toMatchObject({ step: 'pending_cleanup', processed: 0, failed: 1 }) // no database here: counted, still 200
   })
 
   it('keepalive failure is counted in failed and still 200', async () => {

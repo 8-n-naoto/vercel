@@ -56,3 +56,14 @@ export async function revokeLinksForDeletedFile(tx: Tx, fileId: string, by: stri
     .returning({ id: shareLinks.id })
   return rows.length
 }
+
+/** 07 10.2 step 3: revokes every open link of the expired files (revoked_by NULL); one statement. */
+export async function revokeLinksForExpiredFiles(tx: Tx, fileIds: string[], at: Date): Promise<number> {
+  if (fileIds.length === 0) return 0
+  const rows = await tx
+    .update(shareLinks)
+    .set({ revokedAt: at, revokedBy: null, revokeReason: 'file_deleted' })
+    .where(and(inArray(shareLinks.fileId, fileIds), isNull(shareLinks.revokedAt)))
+    .returning({ id: shareLinks.id })
+  return rows.length
+}

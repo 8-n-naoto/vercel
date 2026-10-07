@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, asc, desc, eq, gt, inArray, isNull, lte, ne, not, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, lt, lte, ne, not, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { files, folderMembers, folders, shareLinks } from '@/server/db/schema'
 import type { Db, Tx } from './audit-logs'
@@ -191,4 +191,50 @@ export async function updateFileRestrictions(
     .where(and(eq(files.id, id), eq(files.status, 'active')))
     .returning()
   return rows[0]
+}
+
+/** 07 10.2 step 2: abandoned uploads, oldest first. Rows locked by a concurrent finalize are skipped. */
+export async function lockAbandonedPendingFiles(tx: Reader, now: Date, limit: number) {
+  return tx
+    .select({ id: files.id, storagePath: files.storagePath })
+    .from(files)
+    .where(and(eq(files.status, 'pending'), lt(files.uploadExpiresAt, now)))
+    .orderBy(asc(files.uploadExpiresAt))
+    .limit(limit)
+    .for('update', { skipLocked: true })
+}
+
+/** 07 10.2 step 3: active files expired for more than `retentionDays` days. The folder row is not locked. */
+export async function lockExpiredActiveFiles(tx: Reader, now: Date, retentionDays: number, limit: number) {
+  return tx
+    .select({ id: files.id, storagePath: files.storagePath })
+    .from(files)
+    .where(and(eq(files.status, 'active'), lt(files.expiresAt, sql`${now.toISOString()}::timestamptz - make_interval(days => ${retentionDays})`)))
+    .orderBy(asc(files.expiresAt))
+    .limit(limit)
+    .for('update', { skipLocked: true })
+}
+
+/** 07 10.2 steps 2 / 3: system deletion (deleted_by NULL). One statement for all ids. */
+export async function markFilesDeletedBySystem(
+  tx: Reader,
+  ids: string[],
+  reason: Extract<NonNullable<FileRow['deleteReason']>, 'upload_abandoned' | 'expired'>,
+  at: Date,
+): Promise<void> {
+  if (ids.length === 0) return
+  await tx
+    .update(files)
+    .set({ status: 'deleted', deletedAt: at, deletedBy: null, deleteReason: reason, uploadExpiresAt: null })
+    .where(inArray(files.id, ids))
+}
+
+/** 07 10.2 step 4: deleted files whose object may still exist, oldest deletion first. */
+export async function listUnpurgedDeletedFiles(db: Reader, limit: number) {
+  return db
+    .select({ id: files.id, storagePath: files.storagePath })
+    .from(files)
+    .where(and(eq(files.status, 'deleted'), isNull(files.purgedAt)))
+    .orderBy(asc(files.deletedAt))
+    .limit(limit)
 }
