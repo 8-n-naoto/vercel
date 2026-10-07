@@ -68,3 +68,30 @@ export async function findProfileByEmail(email: string): Promise<ProfileRow | un
 export async function listProfiles(): Promise<ProfileRow[]> {
   return notImplemented('profiles.listProfiles', [])
 }
+
+/** Duplicate check by (lowercase) email, inside the business transaction (06 4.3 step 2, 5.1 step 1). */
+export async function profileEmailExists(tx: Tx, email: string): Promise<boolean> {
+  const rows = await tx.select({ id: profiles.id }).from(profiles).where(eq(profiles.email, email)).limit(1)
+  return rows.length > 0
+}
+
+export async function insertProfile(
+  tx: Tx,
+  v: { id: string; email: string; displayName: string; role: ProfileRow['role'] },
+): Promise<void> {
+  await tx.insert(profiles).values(v)
+}
+
+const stateCols = { id: profiles.id, email: profiles.email, disabledAt: profiles.disabledAt }
+
+/** 06 4.4 step 2: FOR UPDATE. */
+export async function lockProfileStateForUpdate(tx: Tx, id: string) {
+  const rows = await tx.select(stateCols).from(profiles).where(eq(profiles.id, id)).for('update').limit(1)
+  return rows[0]
+}
+
+/** 06 5.3: FOR SHARE. */
+export async function lockProfileStateForShare(tx: Tx, id: string) {
+  const rows = await tx.select(stateCols).from(profiles).where(eq(profiles.id, id)).for('share').limit(1)
+  return rows[0]
+}

@@ -7,4 +7,5 @@ export const AZ_INPUTS: Record<string, unknown> = {
   'account.changePassword': { currentPassword: 'az-current-password', newPassword: 'az-new-password-123', newPasswordConfirm: 'az-new-password-123' },
   'admin.createInvite': { email: 'az-invitee@example.com', role: 'user' },
   'admin.revokeInvite': { inviteId: '00000000-0000-4000-8000-000000000001' },
+  'admin.issuePasswordReset': { userId: '00000000-0000-4000-8000-000000000002' },
 }
