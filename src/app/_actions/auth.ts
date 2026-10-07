@@ -1,9 +1,11 @@
 'use server'
-// 06 4.1 / 4.3 / 4.4. auth.signOut: WP-2.1; invites.accept and passwordReset.complete are stubs until WP-2.3.
+// 06 4.1 / 4.3 / 4.4. auth.signOut (WP-2.1 done); invites.accept and passwordReset.complete are stubs until WP-2.3.
+import { redirect } from 'next/navigation'
 import { appError } from '@/lib/errors'
-import { authSignInInput, invitesAcceptInput, passwordResetCompleteInput } from '@/lib/schemas/auth'
+import { authSignInInput, authSignOutInput, invitesAcceptInput, passwordResetCompleteInput } from '@/lib/schemas/auth'
 import { defineAction } from '@/server/actions/define-action'
 import { rateLimitKey } from '@/server/security/rate-limit'
+import * as authService from '@/server/services/auth'
 
 export const authSignIn = defineAction({
   name: 'auth.signIn',
@@ -13,9 +15,21 @@ export const authSignIn = defineAction({
     { name: 'login:ip', key: (ctx) => rateLimitKey('login:ip', { ip: ctx.requestMeta.ip }), limit: 20, windowSec: 900, auditAction: 'auth.login_rate_limited' },
     { name: 'login:email', key: (_ctx, input) => rateLimitKey('login:email', { email: input.email }), limit: 5, windowSec: 900, auditAction: 'auth.login_rate_limited' },
   ],
-  // WP-2.1 (06 4.1) replaces this handler; the stub only fixes the signature for S01.
-  handler: async () => {
-    throw appError('VALIDATION_FAILED', 'auth.invalid_credentials')
+  handler: async (ctx, input) => {
+    const to = await authService.signIn(ctx, input)
+    redirect(to) // outside any try: defineAction re-throws the redirect (06 3.1 step 6a)
+  },
+})
+
+// 06 4.2. A second call is UNAUTHENTICATED (requireUser in defineAction).
+export const authSignOut = defineAction({
+  name: 'auth.signOut',
+  auth: 'user',
+  input: authSignOutInput,
+  rateLimit: [],
+  handler: async (ctx) => {
+    await authService.signOut(ctx)
+    redirect('/login')
   },
 })
 

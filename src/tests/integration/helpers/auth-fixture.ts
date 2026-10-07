@@ -4,12 +4,12 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { createServerClient } from '@supabase/ssr'
 // Test fixture only: it writes profile rows directly because no repository function exists for disabling / revoking yet (Phase 2).
 // eslint-disable-next-line no-restricted-imports
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import type { UserRole } from '@/lib/domain'
 import { createSupabaseAdminClient } from '@/server/auth/supabase-admin'
 import { getConfig } from '@/server/config'
 import { getDb } from '@/server/db/client'
-import { profiles } from '@/server/db/schema'
+import { auditLogs, profiles } from '@/server/db/schema'
 
 /** In-memory replacement of the Next request cookies / headers. vi.mock('next/headers', ...) points at nextHeadersMock. */
 export const jar = {
@@ -83,4 +83,16 @@ export async function cleanupTestUsers(): Promise<void> {
     await admin.auth.admin.deleteUser(u.id)
   }
   jar.cookies.clear()
+}
+
+/** Read helpers for the login tests (no repository function reads these yet). */
+export async function findLastLoginAt(id: string): Promise<Date | null | undefined> {
+  const [row] = await getDb().select({ at: profiles.lastLoginAt }).from(profiles).where(eq(profiles.id, id))
+  return row?.at
+}
+export async function countAudit(action: 'auth.login' | 'auth.login_failed' | 'auth.logout', filter: { actorId?: string; ip?: string }): Promise<number> {
+  const conds = [eq(auditLogs.action, action)]
+  if (filter.actorId) conds.push(eq(auditLogs.actorId, filter.actorId))
+  if (filter.ip) conds.push(eq(auditLogs.ip, filter.ip))
+  return (await getDb().select({ id: auditLogs.id }).from(auditLogs).where(and(...conds))).length
 }

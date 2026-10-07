@@ -76,7 +76,7 @@ export function defineAction<I, O>(def: ActionDef<I, O>) {
     throw new Error(`defineAction(${def.name}): auth 'public' requires at least one rateLimit rule (06 3.1)`)
   }
 
-  const run = async (raw: unknown): Promise<ActionResult<ActionData<O>>> => {
+  const run = async (raw?: unknown): Promise<ActionResult<ActionData<O>>> => {
     const requestMeta = await getRequestMeta()
     const started = Date.now()
     let userId: string | undefined
