@@ -174,3 +174,31 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   'system.egress_warning': '配信量の警告',
   'system.storage_warning': 'ストレージ使用量の警告',
 }
+
+// ---------- fixed screen texts for S04 / S05 / S12 and D01 / D02 / D05 (08 5.4 / 5.5 / 5.12 / 4.5 / 4.7, 9.4) ----------
+export const FOLDER_TEXT = {
+  deleted: 'フォルダを削除しました',
+  emptyAdmin: 'まだフォルダがありません。[フォルダ作成] から作成してください', // S04 empty (admin)
+  emptyMember: '閲覧できるフォルダはまだありません。管理者に追加を依頼してください', // S04 empty (member)
+  emptyAdminAll: 'まだフォルダがありません', // S12 empty
+  filesEmptyAdmin: 'ファイルはまだありません。[アップロード] から追加してください', // S05-E1
+  filesEmptyMember: '閲覧できるファイルはまだありません', // S05-E2
+  membersEmpty: 'メンバーはまだいません', // S05-E3
+  membersEmptyAdminSuffix: '[メンバー追加] から追加してください', // S05-E3 (admin)
+  candidatesEmpty: '追加できるユーザーがいません（有効な一般ユーザーは全員このフォルダに追加済みです）', // S05-E4
+  membersNote: '※ システム管理者は全フォルダを管理できるため、この一覧には出ません', // S05-N1
+  logsEmpty: 'この条件の閲覧ログはありません',
+  saved: '保存しました',
+} as const
+
+/** C-02 */
+export const removeMemberConfirmText = (displayName: string): string =>
+  `${displayName} さんをこのフォルダから外します。直ちにこのフォルダのファイルを閲覧できなくなります。`
+/** C-05 */
+export const deleteFolderConfirmText = (name: string): string => `フォルダ「${name}」と、その中のすべてのファイル・公開リンクを削除します。元に戻せません。`
+/** S12-2 / D05 */
+export const folderDeletedDetailText = (r: { deletedFiles: number; revokedLinks: number }): string =>
+  `フォルダを削除しました（ファイル ${r.deletedFiles} 件、公開リンク ${r.revokedLinks} 本）`
+/** D02 */
+export const membersAddedText = (r: { added: number; skipped: number }): string =>
+  `${r.added} 人を追加しました${r.skipped > 0 ? `（${r.skipped} 人は既に追加済み）` : ''}`
