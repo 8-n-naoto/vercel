@@ -23,6 +23,7 @@
     "gen:probe": "tsx scripts/gen-probe-html.ts",
     "env:show": "tsx scripts/show-env.ts",
     "verify-db": "tsx scripts/ops/verify-db.ts",
+    "ops:reconcile": "tsx scripts/ops/reconcile.ts",
     "audit": "npm audit --omit=dev --audit-level=high",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
