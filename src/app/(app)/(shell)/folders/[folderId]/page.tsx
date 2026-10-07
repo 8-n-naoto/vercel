@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
-import { EmptyState } from '@/components/features/common/empty-state'
+import { parseLogPeriod, periodFrom } from '@/components/features/access-logs/access-log-filter'
+import { AccessLogTab } from '@/components/features/access-logs/access-log-tab'
 import { FileTable } from '@/components/features/files/file-table'
 import { FolderHeader } from '@/components/features/folders/folder-header'
 import { FolderSettings } from '@/components/features/folders/folder-settings-form'
@@ -8,8 +9,10 @@ import { Breadcrumbs } from '@/components/features/layout/breadcrumbs'
 import { AddMembersDialog } from '@/components/features/members/add-members-dialog'
 import { MemberTable } from '@/components/features/members/member-table'
 import { FOLDER_TEXT } from '@/lib/messages'
+import { parseAccessLogFilter, parsePageNumber } from '@/lib/schemas/access-logs'
 import { zUuid } from '@/lib/schemas/common'
 import { pageContext, runPage } from '@/server/page'
+import { accessLogService } from '@/server/services/access-logs'
 import { filesService, parseFileSort } from '@/server/services/files'
 import { foldersService } from '@/server/services/folders'
 import { membersService } from '@/server/services/members'
@@ -54,8 +57,24 @@ export default async function FolderPage({
       </div>
     )
   } else if (tab === 'logs') {
-    // The access log table and its filter are WP-5.5; only the frame and the empty state exist here.
-    body = <EmptyState>{FOLDER_TEXT.logsEmpty}</EmptyState>
+    // Only an admin reaches this branch (parseFolderTab). Invalid filter values are dropped to the defaults (06 9.7).
+    const period = parseLogPeriod(sp.period)
+    const filter = parseAccessLogFilter({ fileId: sp.file, result: sp.result, via: sp.via, from: periodFrom(period, ctx.now) })
+    const page = parsePageNumber(sp.page)
+    const [list, fileList] = await runPage(ctx, () =>
+      Promise.all([accessLogService.listForFolder(ctx, folderId, filter, { page }), filesService.listInFolder(ctx, folderId, 'name_asc')]),
+    )
+    body = (
+      <AccessLogTab
+        folderId={folderId}
+        list={list}
+        files={fileList.files.map((f) => ({ id: f.id, displayName: f.displayName }))}
+        period={period}
+        file={filter.fileId ?? ''}
+        result={filter.result ?? ''}
+        via={filter.via ?? ''}
+      />
+    )
   } else {
     body = <FolderSettings folderId={folderId} name={detail.name} description={detail.description} />
   }

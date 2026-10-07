@@ -77,6 +77,24 @@ test.describe('folders flow (needs DB, seed and WP-3.3)', () => {
     await expect(page.getByText(MEMBER.email)).toHaveCount(0)
   })
 
+  test('S05-6 admin filters the logs tab by result=denied; the URL carries it and no full token is shown', async ({ page }) => {
+    await signIn(page, ADMIN.email)
+    await page.getByRole('link', { name: folderName }).click()
+    await page.getByRole('link', { name: '閲覧ログ' }).click()
+    await page.getByLabel('結果').selectOption('denied')
+    await page.getByRole('button', { name: '絞り込む' }).click()
+    await expect(page).toHaveURL(/result=denied/)
+    // Needs access-log rows (made by viewing as a member / via a link); with none the empty state is the expected result.
+    const rows = page.getByRole('row')
+    if ((await rows.count()) > 1) {
+      for (const cell of await page.getByRole('cell', { name: /^(許可|拒否)$/ }).allTextContents()) expect(cell).toBe('拒否')
+    } else {
+      await expect(page.getByText('この条件の閲覧ログはありません')).toBeVisible()
+    }
+    // A share link viewer is shown as "label（…xxxx）"; a run of 32+ token characters must never appear.
+    expect(await page.locator('table').allTextContents().then((t) => t.join(' '))).not.toMatch(/[A-Za-z0-9_-]{32,}/)
+  })
+
   test('S05-3 an unknown or non-uuid folder id is a 404', async ({ page }) => {
     await signIn(page, MEMBER.email)
     const r = await page.goto('/folders/abc')

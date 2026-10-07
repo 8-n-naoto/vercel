@@ -108,6 +108,8 @@ export interface AccessLogRow { // S05 access log tab (admin only)
     | { kind: 'share_link'; linkId: string; label: string; tokenHint: string }
   delivered: boolean; ip: string | null; userAgent: string | null
 }
+/** 06 9.7. Built from the URL query (src/lib/schemas/access-logs.ts); invalid values are dropped. from/to are ISO strings: from <= occurred_at < to. */
+export interface AccessLogFilter { fileId?: string; result?: AccessResult; via?: AccessVia; from?: string; to?: string }
 export interface AuditLogRow { // S13
   id: number; occurredAt: string
   actor: { id: string; displayName: string } | null
