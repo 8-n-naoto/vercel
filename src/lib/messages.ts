@@ -225,3 +225,16 @@ export const FILE_TEXT = {
 /** C-01 */
 export const deleteFileConfirmText = (displayName: string): string =>
   `「${displayName}」を削除します。このファイルの公開リンクもすべて使えなくなります。元に戻せません。`
+
+// ---------- S08 / S09 viewer (08 4.10, 9.4 V-01 / V-02) ----------
+export const VIEWER_TEXT = {
+  notice: 'このページの内容は利用者がアップロードしたものです。パスワードや個人情報を入力しないでください。', // V-01
+  loading: '読み込み中…',
+  slow: '表示に時間がかかっています。[再読み込み] を押してください', // 08 4.10
+  download: 'ダウンロード',
+  reload: '再読み込み',
+} as const
+
+/** V-02. `state` is the 08 9.3 display name of the file state. */
+export const previewNoticeText = (state: FileDisplayState): string =>
+  `管理者プレビュー: 閲覧制限を無視して表示しています（現在の状態: ${FILE_DISPLAY_STATE_LABELS[state]}）。メンバーには表示されません`

@@ -3,7 +3,7 @@ import { AUDIT_ACTIONS, CRON_STEPS, DENY_REASONS, type AccessVia, type DenyReaso
 import {
   ACCESS_PURPOSE_LABELS, ACCESS_RESULT_LABELS, ACCESS_VIA_LABELS, AUDIT_ACTION_LABELS, AUDIT_RESULT_LABELS, CRON_STEP_LABELS,
   DENY_REASON_LABELS, FILE_CHARSET_LABELS, FILE_DISPLAY_STATE_LABELS, INVITE_STATE_LABELS, MESSAGES, SHARE_LINK_STATE_LABELS,
-  USER_ROLE_LABELS, accessDenied, message, type MessageKey,
+  USER_ROLE_LABELS, VIEWER_TEXT, accessDenied, message, previewNoticeText, type MessageKey,
 } from '@/lib/messages'
 
 // All messageKey rows of 08 9.1 (50 keys). Copied from the table so that a drift in either direction fails the test.
@@ -129,5 +129,15 @@ describe('FILE_TEXT / deleteFileConfirmText (08 9.4 S06 / S07 / C-01)', () => {
     expect(FILE_TEXT.uploadCancelled).toBe('アップロードを取り消しました')
     expect(FILE_TEXT.uploaded).toBe('アップロードしました。閲覧制限と公開リンクを確認してください')
     expect(deleteFileConfirmText('仕様書')).toBe('「仕様書」を削除します。このファイルの公開リンクもすべて使えなくなります。元に戻せません。')
+  })
+})
+
+describe('viewer texts (08 9.4 V-01 / V-02)', () => {
+  it('V-02 puts the 9.3 file state name in', () => {
+    expect(previewNoticeText('suspended')).toBe('管理者プレビュー: 閲覧制限を無視して表示しています（現在の状態: 公開停止）。メンバーには表示されません')
+    expect(previewNoticeText('not_started')).toContain('現在の状態: 公開前')
+  })
+  it('V-01', () => {
+    expect(VIEWER_TEXT.notice).toBe('このページの内容は利用者がアップロードしたものです。パスワードや個人情報を入力しないでください。')
   })
 })
