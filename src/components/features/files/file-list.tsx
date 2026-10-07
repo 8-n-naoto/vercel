@@ -1,4 +1,4 @@
-// 08 5.5 files tab (Server Component). WP-3.4 provides the frame, the empty states and the tables; WP-4.4 adds the sort select and completes it.
+// 08 5.5 files tab (Server Component). WP-3.4 provides the frame, the empty states and the tables; the sort Select is added by file-table.tsx (WP-4.4).
 // Members get a table without state, link count and detail link (S05-2): those columns are not rendered, not just hidden.
 import Link from 'next/link'
 import { DateTime } from '@/components/features/common/date-time'

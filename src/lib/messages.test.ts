@@ -119,3 +119,15 @@ describe('display names (08 9.3)', () => {
     expect(FILE_CHARSET_LABELS.shift_jis).toBe('Shift_JIS')
   })
 })
+
+describe('FILE_TEXT / deleteFileConfirmText (08 9.4 S06 / S07 / C-01)', () => {
+  it('matches the fixed texts', async () => {
+    const { FILE_TEXT, deleteFileConfirmText } = await import('@/lib/messages')
+    expect(FILE_TEXT.dropZoneHint(50)).toBe('ここに HTML ファイルをドロップ、または [ファイルを選択]／.html / .htm、1 ファイル 50MB まで')
+    expect(FILE_TEXT.quota({ userUsed: '1MB', userLimit: '100MB', totalUsed: '2MB', totalLimit: '200MB' })).toBe('残り容量: あなた 1MB / 100MB、全体 2MB / 200MB')
+    expect(FILE_TEXT.multipleDropped).toBe('1 回に 1 ファイルだけアップロードできます')
+    expect(FILE_TEXT.uploadCancelled).toBe('アップロードを取り消しました')
+    expect(FILE_TEXT.uploaded).toBe('アップロードしました。閲覧制限と公開リンクを確認してください')
+    expect(deleteFileConfirmText('仕様書')).toBe('「仕様書」を削除します。このファイルの公開リンクもすべて使えなくなります。元に戻せません。')
+  })
+})

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { EmptyState } from '@/components/features/common/empty-state'
-import { FileList } from '@/components/features/files/file-list'
+import { FileTable } from '@/components/features/files/file-table'
 import { FolderHeader } from '@/components/features/folders/folder-header'
 import { FolderSettings } from '@/components/features/folders/folder-settings-form'
 import { FolderTabs, parseFolderTab } from '@/components/features/folders/folder-tabs'
@@ -39,8 +39,9 @@ export default async function FolderPage({
 
   let body: React.ReactNode
   if (tab === 'files') {
-    const list = await runPage(ctx, () => filesService.listInFolder(ctx, folderId, parseFileSort(sp.sort)))
-    body = <FileList list={list} />
+    const sort = parseFileSort(sp.sort)
+    const list = await runPage(ctx, () => filesService.listInFolder(ctx, folderId, sort))
+    body = <FileTable folderId={folderId} list={list} sort={sort} />
   } else if (tab === 'members') {
     const [list, candidates] = await runPage(ctx, () =>
       Promise.all([membersService.list(ctx, folderId), detail.access === 'admin' ? membersService.listCandidates(ctx, folderId) : Promise.resolve(null)]),

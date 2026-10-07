@@ -202,3 +202,26 @@ export const folderDeletedDetailText = (r: { deletedFiles: number; revokedLinks:
 /** D02 */
 export const membersAddedText = (r: { added: number; skipped: number }): string =>
   `${r.added} 人を追加しました${r.skipped > 0 ? `（${r.skipped} 人は既に追加済み）` : ''}`
+
+// ---------- fixed screen texts for S06 / S07 (08 5.6 / 5.7 / 9.4) ----------
+export const FILE_TEXT = {
+  dropZoneHint: (maxMb: number): string => `ここに HTML ファイルをドロップ、または [ファイルを選択]／.html / .htm、1 ファイル ${maxMb}MB まで`, // S06-N1
+  quota: (u: { userUsed: string; userLimit: string; totalUsed: string; totalLimit: string }): string =>
+    `残り容量: あなた ${u.userUsed} / ${u.userLimit}、全体 ${u.totalUsed} / ${u.totalLimit}`, // S06-N2
+  cdnNote: '※ 外部の CDN・画像・フォントを読み込む HTML は正しく表示されません。1 ファイルで完結した HTML をアップロードしてください。', // S06-N3
+  backupNote: '※ アップロードしたファイルはバックアップされません。原本は手元に保管してください。', // S06-N4
+  multipleDropped: '1 回に 1 ファイルだけアップロードできます', // S06-M1
+  uploadCancelled: 'アップロードを取り消しました', // S06-M2
+  uploaded: 'アップロードしました。閲覧制限と公開リンクを確認してください', // S07-M1
+  expiresNote: '過ぎると閲覧できなくなり、30 日後に自動で削除されます', // S07-N1
+  downloadNote: '※ ダウンロード不可にしても、閲覧者はブラウザの機能で内容を保存できます。', // S07-N2
+  charsetNote: '文字化けする場合は文字コードを変更してください', // S07-N4
+  restrictionsHeading: '閲覧制限（すべての閲覧方法に適用）',
+  linksHeading: '公開リンク（ログイン不要で閲覧できる URL）',
+  linksEmpty: '公開リンクはありません',
+  noChanges: '変更はありません',
+} as const
+
+/** C-01 */
+export const deleteFileConfirmText = (displayName: string): string =>
+  `「${displayName}」を削除します。このファイルの公開リンクもすべて使えなくなります。元に戻せません。`
