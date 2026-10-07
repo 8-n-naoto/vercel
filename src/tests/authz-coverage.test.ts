@@ -7,6 +7,9 @@ import { ACTION_BRAND } from '@/server/actions/brand'
 import { ROUTE_BRAND } from '@/server/http/brand'
 import { PUBLIC_PAGES } from '@/server/page-registry'
 
+// Dynamic imports pull the whole server import chain (cold transform ~2s alone, >5s under load): give those tests a real budget
+// per test instead of raising the global testTimeout.
+const IMPORT_TIMEOUT = 30_000
 const ROOT = process.cwd()
 const rel = (p: string) => p.split(path.sep).join('/')
 const files = (pattern: string) => globSync(pattern, { cwd: ROOT }).map(rel).sort()
@@ -44,7 +47,8 @@ const brandOf = (value: unknown, brand: symbol): Branded | null => {
   return { name, auth, host: typeof host === 'string' ? host : undefined }
 }
 
-const actionFiles = files('src/app/**/_actions/*.ts')
+// Colocated unit tests (e.g. view.test.ts) are not actions: importing them would register suites inside a test.
+const actionFiles = files('src/app/**/_actions/*.ts').filter((f) => !/\.test\.tsx?$/.test(f))
 const routeFiles = files('src/app/**/route.ts')
 const pageFiles = files('src/app/**/page.tsx')
 
@@ -70,7 +74,7 @@ describe('authz coverage: Server Actions (AZ-08)', () => {
       }
     }
     expect(problems).toEqual([])
-  })
+  }, IMPORT_TIMEOUT)
 
   it('AZ-07: auth public actions are within the approved list of 06 11 (equality is required once WP-1.x adds all four)', async () => {
     const pub: string[] = []
@@ -82,7 +86,7 @@ describe('authz coverage: Server Actions (AZ-08)', () => {
     }
     expect(APPROVED_PUBLIC_ACTIONS).toEqual(expect.arrayContaining(pub))
     expect(new Set(pub).size).toBe(pub.length)
-  })
+  }, IMPORT_TIMEOUT)
 })
 
 describe('authz coverage: Route Handlers (AZ-09)', () => {
@@ -106,7 +110,7 @@ describe('authz coverage: Route Handlers (AZ-09)', () => {
       }
     }
     expect(problems).toEqual([])
-  })
+  }, IMPORT_TIMEOUT)
 })
 
 describe('authz coverage: pages (06 11)', () => {
