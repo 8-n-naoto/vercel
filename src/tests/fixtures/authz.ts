@@ -1,13 +1,13 @@
 // Test vectors for decideFolderAccess (07 13.1, FA-01..FA-11) and decideSession (07 13.2, SS-01..SS-11). IDs preserved.
-import type { FolderAccessResult, FolderRow, FolderNeed } from '@/server/authz/folder'
+import type { FolderAccessResult, FolderAccessRow, FolderNeed } from '@/server/authz/folder'
 import type { SessionInput } from '@/server/authz/session'
 import type { UserRole } from '@/lib/domain'
 
-const row = (folderDeleted: boolean, isMember: boolean): FolderRow => ({ folderDeleted, isMember })
+const row = (folderDeleted: boolean, isMember: boolean): FolderAccessRow => ({ folderDeleted, isMember })
 const ok = (access: 'admin' | 'member'): FolderAccessResult => ({ ok: true, access })
 const ng = (code: 'NOT_FOUND' | 'FORBIDDEN'): FolderAccessResult => ({ ok: false, code })
 
-export const FA_CASES: { id: string; role: UserRole; row: FolderRow | null; need: FolderNeed; expected: FolderAccessResult }[] = [
+export const FA_CASES: { id: string; role: UserRole; row: FolderAccessRow | null; need: FolderNeed; expected: FolderAccessResult }[] = [
   { id: 'FA-01', role: 'admin', row: null, need: 'view', expected: ng('NOT_FOUND') },
   { id: 'FA-02', role: 'admin', row: row(true, false), need: 'manage', expected: ng('NOT_FOUND') },
   { id: 'FA-03', role: 'admin', row: row(false, false), need: 'manage', expected: ok('admin') },
