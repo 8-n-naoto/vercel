@@ -32,10 +32,24 @@ describe('boundaries outside 07 (T-018)', () => {
   it.each(KEY_X_CASES)('$id rateLimitKey', ({ rule, parts, expected }) => {
     expect(rateLimitKey(rule, parts)).toBe(expected)
   })
-  // Judgement requested in the T-018 report: the implementation returns a non-integer / NaN retryAfterSec.
-  it.todo('RL-X12 decideRateLimit: retry 1.5 should give an integer retryAfterSec (Retry-After header)')
-  it.todo('RL-X13 decideRateLimit: retry NaN should not produce a NaN retryAfterSec')
-  it.todo('RL-X14 rateLimitKey: empty-string ip should map to unknown (currently the key ends with an empty ip)')
+  // D-020: fail-closed / normalized outputs.
+  it('RL-X12 decideRateLimit: retry 1.5 gives integer retryAfterSec 2', () => {
+    expect(decideRateLimit(6, 5, 1.5)).toEqual({ ok: false, retryAfterSec: 2, writeAudit: true })
+  })
+  it('RL-X13 decideRateLimit: retry NaN / Infinity gives retryAfterSec 60', () => {
+    expect(decideRateLimit(6, 5, Number.NaN)).toEqual({ ok: false, retryAfterSec: 60, writeAudit: true })
+    expect(decideRateLimit(6, 5, Infinity)).toEqual({ ok: false, retryAfterSec: 60, writeAudit: true })
+  })
+  it('RL-X14 rateLimitKey: empty, whitespace-only and undefined ip map to unknown', () => {
+    expect(rateLimitKey('share:ip', { ip: '' })).toBe('share:ip:unknown')
+    expect(rateLimitKey('share:ip', { ip: '   ' })).toBe('share:ip:unknown')
+    expect(rateLimitKey('share-pw:link-ip', { linkId: 'L', ip: '' })).toBe('share-pw:link-ip:L:unknown')
+  })
+  it('RL-X16 decideRateLimit: NaN / Infinity count or NaN limit is rejected, never ok', () => {
+    expect(decideRateLimit(Number.NaN, 5, 60)).toMatchObject({ ok: false })
+    expect(decideRateLimit(Infinity, Infinity, 60)).toMatchObject({ ok: false })
+    expect(decideRateLimit(1, Number.NaN, 60)).toMatchObject({ ok: false })
+  })
   it.todo('RL-X15 rateLimitKey: linkId containing ":" can collide with another (linkId, ip) pair; linkId must be a UUID at the call site')
 })
 

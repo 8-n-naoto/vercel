@@ -27,15 +27,18 @@ export type RateLimitDecision = { ok: true } | { ok: false; retryAfterSec: numbe
 
 /** count <= limit is ok. Over the limit: retryAfterSec >= 1, and only the first excess (count === limit + 1) writes an audit log. */
 export function decideRateLimit(count: number, limit: number, retryAfter: number): RateLimitDecision {
+  // D-020: non-finite count / limit are rejected; retryAfterSec is an integer >= 1 (Retry-After), 60 when retryAfter is not finite.
+  const retryAfterSec = Number.isFinite(retryAfter) ? Math.max(1, Math.ceil(retryAfter)) : 60
+  if (!Number.isFinite(count) || !Number.isFinite(limit)) return { ok: false, retryAfterSec, writeAudit: false }
   if (count <= limit) return { ok: true }
-  return { ok: false, retryAfterSec: Math.max(1, retryAfter), writeAudit: count === limit + 1 }
+  return { ok: false, retryAfterSec, writeAudit: count === limit + 1 }
 }
 
 const sha256hex = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex')
 
 /** Key layout of 06 3.5. A null or missing ip becomes 'unknown'. Emails are hashed so the key holds no address. */
 export function rateLimitKey(rule: RateLimitRuleName, parts: RateLimitParts): string {
-  const ip = parts.ip ?? 'unknown'
+  const ip = parts.ip?.trim() || 'unknown' // null, undefined, empty and whitespace-only all become 'unknown' (D-020)
   switch (rule) {
     case 'login:email':
       return `${rule}:${sha256hex((parts.email ?? '').trim().toLowerCase())}`

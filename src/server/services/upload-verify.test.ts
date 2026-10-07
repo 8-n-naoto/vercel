@@ -27,7 +27,15 @@ describe('verifyUpload / detectCharset boundaries outside 07 (T-018)', () => {
     expect(detectCharset(new TextEncoder().encode(`<meta charset="${label}">`))).toBe(expected)
     expect(detectCharset(new TextEncoder().encode(`<meta charset="${label.toUpperCase()}">`))).toBe(expected)
   })
-  // Judgement requested in the T-018 report.
-  it.todo('UV-X40 verifyUpload: NaN or fractional size should be rejected (NaN currently passes both size checks)')
+  // D-020: invalid sizes are rejected (fail-closed).
+  const html = new TextEncoder().encode('<!doctype html><p>a')
+  it('UV-X40 verifyUpload: NaN or fractional size is rejected', () => {
+    expect(verifyUpload({ size: Number.NaN, mime: 'text/html', head: html, maxBytes: MAX_BYTES })).toEqual({ ok: false, reason: 'empty' })
+    expect(verifyUpload({ size: 1.5, mime: 'text/html', head: html, maxBytes: MAX_BYTES })).toEqual({ ok: false, reason: 'empty' })
+  })
+  it('UV-X42 verifyUpload: Infinity size is too_large; non-finite maxBytes admits nothing', () => {
+    expect(verifyUpload({ size: Infinity, mime: 'text/html', head: html, maxBytes: MAX_BYTES })).toEqual({ ok: false, reason: 'too_large' })
+    expect(verifyUpload({ size: 10, mime: 'text/html', head: html, maxBytes: Number.NaN })).toEqual({ ok: false, reason: 'too_large' })
+  })
   it.todo('UV-X41 detectCharset: a meta placed after byte 4096 should be ignored when the head is longer than 4096 bytes (07 9.2); the caller truncates today')
 })

@@ -14,7 +14,21 @@ describe('decideSession boundaries outside 07 (T-018)', () => {
   it.each(SS_X_CASES)('$id', ({ input, expected }) => {
     expect(decideSession(input)).toBe(expected)
   })
-  // Judgement requested in the T-018 report: NaN / Infinity authTimeSec currently pass (comparisons with NaN are false).
-  it.todo('SS-X07 decideSession: NaN authTimeSec should be UNAUTHENTICATED')
-  it.todo('SS-X08 decideSession: Infinity authTimeSec should be UNAUTHENTICATED')
+  // D-020: non-finite numeric input is rejected (fail-closed).
+  const T_SEC = Date.UTC(2026, 9, 10, 10) / 1000
+  const base = { sub: 'u', profile: { disabledAt: null, sessionRevokedAt: null }, authTimeSec: T_SEC, nowMs: T_SEC * 1000, maxAgeDays: 7 }
+  it('SS-X07 decideSession: NaN authTimeSec is UNAUTHENTICATED', () => {
+    expect(decideSession({ ...base, authTimeSec: Number.NaN })).toBe('UNAUTHENTICATED')
+  })
+  it('SS-X08 decideSession: Infinity / -Infinity authTimeSec is UNAUTHENTICATED', () => {
+    expect(decideSession({ ...base, authTimeSec: Infinity })).toBe('UNAUTHENTICATED')
+    expect(decideSession({ ...base, authTimeSec: -Infinity })).toBe('UNAUTHENTICATED')
+  })
+  it('SS-X09 decideSession: non-finite nowMs or maxAgeDays is UNAUTHENTICATED', () => {
+    expect(decideSession({ ...base, nowMs: Number.NaN })).toBe('UNAUTHENTICATED')
+    expect(decideSession({ ...base, maxAgeDays: Number.NaN })).toBe('UNAUTHENTICATED')
+  })
+  it('SS-X10 decideSession: the finite baseline is still ok', () => {
+    expect(decideSession(base)).toBe('ok')
+  })
 })

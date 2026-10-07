@@ -81,6 +81,8 @@ export function decideSession(i: SessionInput): 'ok' | 'UNAUTHENTICATED' {
   if (i.sub === null) return 'UNAUTHENTICATED'
   if (i.profile === null || i.profile.disabledAt !== null) return 'UNAUTHENTICATED'
   if (i.authTimeSec === null) return 'UNAUTHENTICATED'
+  // D-020: non-finite numbers are never trusted (comparisons with NaN are false and would fall through to ok).
+  if (!Number.isFinite(i.authTimeSec) || !Number.isFinite(i.nowMs) || !Number.isFinite(i.maxAgeDays)) return 'UNAUTHENTICATED'
   const authMs = i.authTimeSec * 1000
   if (i.profile.sessionRevokedAt !== null && authMs < i.profile.sessionRevokedAt.getTime()) return 'UNAUTHENTICATED'
   if (i.nowMs - authMs > i.maxAgeDays * 86_400_000) return 'UNAUTHENTICATED'

@@ -40,8 +40,9 @@ export function verifyUpload(i: {
   head: Uint8Array
   maxBytes: number
 }): { ok: true; charset: FileCharset } | { ok: false; reason: VerifyFailReason } {
-  if (i.size <= 0) return { ok: false, reason: 'empty' }
-  if (i.size > i.maxBytes) return { ok: false, reason: 'too_large' }
+  // D-020: NaN and fractional sizes are rejected as unknown (empty); a non-finite maxBytes admits nothing.
+  if (Number.isNaN(i.size) || i.size <= 0 || (Number.isFinite(i.size) && !Number.isInteger(i.size))) return { ok: false, reason: 'empty' }
+  if (!Number.isFinite(i.maxBytes) || i.size > i.maxBytes) return { ok: false, reason: 'too_large' }
   const mime = i.mime === null ? null : (i.mime.split(';')[0] ?? '').trim().toLowerCase()
   if (mime !== 'text/html') return { ok: false, reason: 'not_html' }
   const h = i.head
