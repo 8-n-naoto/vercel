@@ -84,3 +84,14 @@ describe.skipIf(!dbUp)('authorization matrix over every user / admin action (07 
     })
   }
 })
+
+// 02 10 phase 2 (2) / 07 13.3 AZ-02: the folder and member Actions are admin-only. The loops above expand over every registered Action,
+// so this guard fails if one of them is ever registered with a weaker auth (or disappears from the matrix).
+// AZ-03 / AZ-04 (view.*) belong to phase 5 and are not covered here.
+describe.skipIf(!dbUp)('folders.* / members.* are in the matrix as admin-only (WP-3.5)', () => {
+  for (const name of ['folders.create', 'folders.update', 'folders.delete', 'members.add', 'members.remove']) {
+    it(`${name} is registered with auth: admin (AZ-01 / 02 / 05 / 06 run for it above)`, () => {
+      expect(adminOnly.map((a) => a.name)).toContain(name)
+    })
+  }
+})
