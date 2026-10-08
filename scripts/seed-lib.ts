@@ -12,6 +12,30 @@ export const SEED_USERS: readonly { email: string; displayName: string; role: Us
 export const SEED_EMAILS: readonly string[] = SEED_USERS.map((u) => u.email)
 const ADMIN_EMAIL = 'seed-admin@example.com'
 
+// Opt-in extra members (SEED_EXTRA_MEMBERS=N): seed-member-2 .. seed-member-(N+1). Cleanup always covers the whole range.
+export const SEED_EXTRA_MEMBERS_MAX = 19
+type SeedUser = (typeof SEED_USERS)[number]
+const extraMemberEmail = (n: number): string => `seed-member-${n}@example.com`
+/** Extra member accounts for seed-member-2 .. seed-member-(count+1). */
+export function extraSeedMembers(count: number): SeedUser[] {
+  return Array.from({ length: count }, (_, i) => ({
+    email: extraMemberEmail(i + 2),
+    displayName: `Seed Member ${i + 2}`,
+    role: 'user' as const,
+    member: true,
+  }))
+}
+/** Every extra e-mail cleanup may touch, independent of SEED_EXTRA_MEMBERS. */
+export const SEED_EXTRA_EMAILS: readonly string[] = extraSeedMembers(SEED_EXTRA_MEMBERS_MAX).map((u) => u.email)
+
+/** Parses SEED_EXTRA_MEMBERS: unset or empty is 0; otherwise an integer 0..19. Returns null when invalid. */
+function parseExtraMembers(raw: string | undefined): number | null {
+  if (raw === undefined || raw === '') return 0
+  if (!/^[0-9]{1,2}$/.test(raw)) return null
+  const n = Number(raw)
+  return n <= SEED_EXTRA_MEMBERS_MAX ? n : null
+}
+
 /** Auth admin API subset (auth.admin of supabase-js). */
 export interface SeedAuthAdmin {
   findUserIdByEmail(email: string): Promise<string | null>
@@ -43,7 +67,7 @@ export interface SeedContext {
 const passwordSchema = z.string().min(12)
 
 /** Checks APP_ENV (and SEED_PASSWORD when needed) before any dependency is touched. */
-function preflight(ctx: SeedContext, needPassword: boolean): { ok: boolean; password?: string } {
+function preflight(ctx: SeedContext, needPassword: boolean): { ok: boolean; password?: string; extra?: number } {
   const appEnv = ctx.env.APP_ENV
   if (appEnv !== 'local' && appEnv !== 'test') {
     ctx.log(`seed: APP_ENV must be "local" or "test" (got "${appEnv ?? ''}"). Refusing to run.`)
@@ -55,15 +79,21 @@ function preflight(ctx: SeedContext, needPassword: boolean): { ok: boolean; pass
     ctx.log('seed: SEED_PASSWORD is not set or shorter than 12 characters. Set it in .env.local (value is not shown).')
     return { ok: false }
   }
-  return { ok: true, password: parsed.data }
+  const extra = parseExtraMembers(ctx.env.SEED_EXTRA_MEMBERS)
+  if (extra === null) {
+    ctx.log(`seed: SEED_EXTRA_MEMBERS must be an integer from 0 to ${SEED_EXTRA_MEMBERS_MAX} (value is not shown).`)
+    return { ok: false }
+  }
+  return { ok: true, password: parsed.data, extra }
 }
 
 /** Returns the process exit code. */
 export async function runSeed(ctx: SeedContext): Promise<number> {
   const pre = preflight(ctx, true)
   if (!pre.ok || pre.password === undefined) return 1
+  const users = [...SEED_USERS, ...extraSeedMembers(pre.extra ?? 0)]
   const ids = new Map<string, string>()
-  for (const u of SEED_USERS) {
+  for (const u of users) {
     let id = await ctx.auth.findUserIdByEmail(u.email)
     const created = id === null
     if (id === null) id = await ctx.auth.createUser(u.email, pre.password)
@@ -77,7 +107,7 @@ export async function runSeed(ctx: SeedContext): Promise<number> {
   const folderCreated = folderId === null
   if (folderId === null) folderId = await ctx.db.createFolder(SEED_FOLDER_NAME, adminId)
   ctx.log(`folder        ${SEED_FOLDER_NAME}  ${folderCreated ? 'created' : 'reused'}`)
-  for (const u of SEED_USERS.filter((x) => x.member)) {
+  for (const u of users.filter((x) => x.member)) {
     const uid = ids.get(u.email)
     if (uid === undefined) throw new Error('seed member id missing')
     await ctx.db.addMember(folderId, uid, adminId)
@@ -87,11 +117,13 @@ export async function runSeed(ctx: SeedContext): Promise<number> {
   return 0
 }
 
-/** Returns the process exit code. Only rows tied to the three fixed seed e-mails are touched; other FK references fail (RESTRICT) on purpose. */
+/** Returns the process exit code. Only rows tied to the three fixed seed e-mails and seed-member-2..20 are touched (independent of SEED_EXTRA_MEMBERS); other FK references fail (RESTRICT) on purpose. */
 export async function runCleanup(ctx: SeedContext): Promise<number> {
   const pre = preflight(ctx, false)
   if (!pre.ok) return 1
-  const profiles = await ctx.db.profileIdsByEmail(SEED_EMAILS)
+  const fixed = await ctx.db.profileIdsByEmail(SEED_EMAILS)
+  const extra = await ctx.db.profileIdsByEmail(SEED_EXTRA_EMAILS)
+  const profiles = [...fixed, ...extra.filter((e) => !fixed.some((f) => f.id === e.id))]
   const userIds = profiles.map((p) => p.id)
   const adminIds = profiles.filter((p) => p.email === ADMIN_EMAIL).map((p) => p.id)
   const folderIds = await ctx.db.seedFolderIds(SEED_FOLDER_NAME, adminIds)
@@ -99,10 +131,11 @@ export async function runCleanup(ctx: SeedContext): Promise<number> {
   await ctx.db.deleteMembers(folderIds, userIds)
   await ctx.db.deleteFolders(folderIds)
   await ctx.db.deleteProfiles(userIds)
-  for (const email of SEED_EMAILS) {
+  for (const email of [...SEED_EMAILS, ...SEED_EXTRA_EMAILS]) {
     const id = await ctx.auth.findUserIdByEmail(email)
     if (id !== null) await ctx.auth.deleteUser(id)
-    ctx.log(`auth          ${email}  ${id !== null ? 'deleted' : 'absent'}`)
+    // Extra e-mails that never existed are skipped silently so that the default output stays unchanged.
+    if (id !== null || SEED_EMAILS.includes(email)) ctx.log(`auth          ${email}  ${id !== null ? 'deleted' : 'absent'}`)
   }
   ctx.log('seed-cleanup: done')
   return 0

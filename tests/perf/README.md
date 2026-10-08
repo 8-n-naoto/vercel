@@ -97,7 +97,7 @@ PERF_MODE=nf11 （同じ環境変数） k6 run tests/perf/k6/view-raw.js
 PERF_MODE=limit-check （同じ環境変数） k6 run tests/perf/k6/view-raw.js
 ```
 
-前提（人間作業）: メンバーのログイン Cookie が N = 5 名分要る。`npm run seed` が作るメンバーは `seed-member@example.com` の 1 名だけ（`scripts/seed.ts`、runbook §10）。残り 4 名は、管理者として招待 → 受諾（S10 / S02）で作るか、`seed.ts` を複数メンバーに拡張する（`scripts/**` は T-057 の範囲外。infra-sre への依頼）。全員を測定用フォルダ（`PERF_FILE_ID` のあるフォルダ）のメンバーにする。測定後は招待したアカウントを無効化または削除する。
+前提（人間作業）: メンバーのログイン Cookie が N = 5 名分要る。`.env.local` に `SEED_EXTRA_MEMBERS=4` を設定して `npm run seed` を実行すると、`seed-member@example.com` と `seed-member-2` 〜 `seed-member-5@example.com` の 5 名が `seed-folder` のメンバーとして作られる（パスワードは `SEED_PASSWORD`。runbook §10、T-059）。5 名それぞれでログインして Cookie を取得し `PERF_COOKIE_1..5` に設定するのは人間（ログに出さない）。`PERF_FILE_ID` のファイルは `seed-folder` に置くか、5 名を測定用フォルダのメンバーに追加する（seed は files を作らない）。測定後は `npm run seed:cleanup`（`seed-member-2..20` も対象）。
 
 ## 結果の記録先
 
