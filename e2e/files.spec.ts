@@ -5,6 +5,7 @@
 // run and record it in 10. S07-3 (share link revoke) is held until WP-6.3 (the share link table does not exist yet).
 // Residue: the tests create a folder named `e2e-<runId>-files`; the last test deletes it, but a failed run leaves it (see docs/runbook.md section 10).
 import { randomBytes } from 'node:crypto'
+import { writeFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import { SEED_USERS } from '../scripts/seed-lib'
 import { signIn } from './support/session'
@@ -140,6 +141,8 @@ test.describe('files flow (needs DB, seed and WP-4.1 / WP-4.2)', () => {
     await signIn(page, ADMIN.email)
     await page.goto(folderUrl)
     await page.getByRole('row', { name: new RegExp(fileTitle) }).getByRole('link', { name: '詳細' }).click()
+    // click() does not wait for the soft navigation, so wait for the detail URL before reading it.
+    await expect(page).toHaveURL(/\/folders\/[0-9a-f-]{36}\/files\/[0-9a-f-]{36}$/)
     const detailUrl = page.url()
     await page.getByLabel('公開を停止する').check()
     await page.getByRole('button', { name: '保存' }).last().click()
@@ -153,6 +156,7 @@ test.describe('files flow (needs DB, seed and WP-4.1 / WP-4.2)', () => {
     await expect(memberPage.getByText(fileTitle)).toHaveCount(0)
     const r = await memberPage.goto(detailUrl)
     expect(r?.status()).toBe(404)
+    await expect(memberPage.locator('body')).toContainText('ページが見つかりません')
     await ctx.close()
   })
 
@@ -170,7 +174,10 @@ test.describe('files flow (needs DB, seed and WP-4.1 / WP-4.2)', () => {
     const head = Buffer.from('<!doctype html><html><head><meta charset="utf-8"><title>max</title></head><body>', 'utf-8')
     const body = Buffer.alloc(50 * 1024 * 1024, 0x61)
     head.copy(body)
-    await page.getByLabel('アップロードするファイル').setInputFiles({ name: 'max50.html', mimeType: 'text/html', buffer: body })
+    // Playwright refuses in-memory buffers of 50MB or more, so pass a file path (under the test output dir, which Playwright manages).
+    const maxPath = test.info().outputPath('max50.html')
+    writeFileSync(maxPath, body)
+    await page.getByLabel('アップロードするファイル').setInputFiles(maxPath)
     await expect(page.getByText(/ファイルサイズが上限/)).toHaveCount(0)
     await page.getByLabel('表示名').fill(`abn-${runId}-max`)
     await page.getByRole('button', { name: 'アップロード', exact: true }).click()
@@ -181,7 +188,9 @@ test.describe('files flow (needs DB, seed and WP-4.1 / WP-4.2)', () => {
   test('P3-2 browser layer: 50MB + 1 byte generated in the test is refused with the size message, and so is a .htm.exe name; the list does not grow', async ({ page }) => {
     await signIn(page, ADMIN.email)
     await page.goto(`${folderUrl}/upload`)
-    await page.getByLabel('アップロードするファイル').setInputFiles({ name: 'over.html', mimeType: 'text/html', buffer: Buffer.alloc(50 * 1024 * 1024 + 1, 0x61) })
+    const overPath = test.info().outputPath('over.html')
+    writeFileSync(overPath, Buffer.alloc(50 * 1024 * 1024 + 1, 0x61))
+    await page.getByLabel('アップロードするファイル').setInputFiles(overPath)
     await expect(page.getByText(/ファイルサイズが上限（\d+MB）を超えています/)).toBeVisible()
     await expect(page.getByRole('button', { name: 'アップロード', exact: true })).toBeDisabled()
     await page.getByRole('button', { name: '選び直す' }).click()
