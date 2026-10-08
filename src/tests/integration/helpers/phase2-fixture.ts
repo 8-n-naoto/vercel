@@ -43,7 +43,8 @@ export async function countAuditSince(
 export async function expireInvite(inviteId: string): Promise<void> {
   await getDb()
     .update(invites)
-    .set({ expiresAt: new Date(Date.now() - 60_000) })
+    // invites_expires_ck requires expires_at > created_at, so created_at moves into the past as well.
+    .set({ createdAt: new Date(Date.now() - 120_000), expiresAt: new Date(Date.now() - 60_000) })
     .where(eq(invites.id, inviteId))
 }
 

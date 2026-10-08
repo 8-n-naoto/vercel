@@ -16,6 +16,7 @@ import type { ServiceContext } from '@/server/actions/define-action'
 import { closeDb, getDb, pingDb } from '@/server/db/client'
 import { auditLogs, files } from '@/server/db/schema'
 import { getObjects } from '@/server/storage/objects'
+import { filesStartUploadInput } from '@/lib/schemas/files'
 import { uploadsService } from '@/server/services/uploads'
 import { cleanupTestUsers, createTestUser, type TestUser } from './helpers/auth-fixture'
 import { cleanupFolderFixtures, createFolderRow } from './helpers/folder-fixture'
@@ -112,8 +113,10 @@ describe.skipIf(!dbUp)('abnormal uploads (WP-4.7)', () => {
     const admin = await createTestUser('admin')
     const folderId = await newFolder(admin)
     const base = { folderId, originalFilename: 'it.html', displayName: null, sizeBytes: 10, contentType: 'text/html' }
-    for (const over of [{ sizeBytes: MAX + 1 }, { originalFilename: 'it.txt' }, { originalFilename: 'it.html.exe' }, { sizeBytes: 0 }]) {
-      expect(await shapeOf(uploadsService.startUpload(ctxOf(admin), { ...base, ...over }))).toMatchObject({ code: 'VALIDATION_FAILED' })
+    // 06 7.1: the size limit and contentType are checked by the service; the extension and sizeBytes >= 1 are in the zod schema of the Action.
+    expect(await shapeOf(uploadsService.startUpload(ctxOf(admin), { ...base, sizeBytes: MAX + 1 }))).toMatchObject({ code: 'VALIDATION_FAILED' })
+    for (const over of [{ originalFilename: 'it.txt' }, { originalFilename: 'it.html.exe' }, { sizeBytes: 0 }]) {
+      expect(filesStartUploadInput.safeParse({ ...base, ...over }).success, JSON.stringify(over)).toBe(false)
     }
     expect(await getDb().select().from(files).where(eq(files.folderId, folderId))).toEqual([])
   })

@@ -131,7 +131,7 @@ describe.skipIf(!dbUp)('files edit / delete / read (WP-4.2)', () => {
     const id = await activeFile(admin, folderId)
     const past = new Date(Date.now() - 3_600_000).toISOString()
     expect(await shapeOf(fileEditsService.updateRestrictions(ctxOf(admin), { fileId: id, ...R, expiresAt: past }))).toMatchObject({ code: 'VALIDATION_FAILED' })
-    await getDb().update(files).set({ expiresAt: new Date(past) }).where(eq(files.id, id)) // seeded directly (expired file)
+    await getDb().update(files).set({ expiresAt: new Date(Math.floor(Date.parse(past) / 1000) * 1000) }).where(eq(files.id, id)) // seeded directly (expired file); stored values are second-truncated (toUtcSeconds), so is the seed
     const d = await fileEditsService.updateRestrictions(ctxOf(admin), { fileId: id, ...R, suspended: true, expiresAt: past })
     expect(d.restrictions.suspended).toBe(true)
   })

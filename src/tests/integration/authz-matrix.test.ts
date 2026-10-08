@@ -10,7 +10,7 @@ vi.mock('next/headers', async () => (await import('./helpers/auth-fixture')).nex
 import { ACTION_BRAND } from '@/server/actions/brand'
 import { closeDb, pingDb } from '@/server/db/client'
 import { AZ_INPUTS } from '@/tests/fixtures/az-inputs'
-import { cleanupTestUsers, createTestUser, disableUser, jar, revokeSessions, signIn } from './helpers/auth-fixture'
+import { cleanupTestUsers, createTestUser, disableUser, jar, resetUserState, revokeSessions, signIn, type TestUser } from './helpers/auth-fixture'
 
 const dbUp = await pingDb().then(
   () => true,
@@ -28,6 +28,7 @@ const ROOT = process.cwd()
 async function listActions(): Promise<RegisteredAction[]> {
   const out: RegisteredAction[] = []
   for (const f of globSync('src/app/**/_actions/*.ts', { cwd: ROOT })) {
+    if (f.endsWith('.test.ts')) continue // a unit test next to an Action must not be imported here (its describe blocks would register in this file)
     const mod: Record<string, unknown> = await import(/* @vite-ignore */ path.join(ROOT, f))
     for (const value of Object.values(mod)) {
       if (typeof value !== 'function') continue
@@ -53,6 +54,21 @@ afterAll(async () => {
 })
 beforeEach(() => jar.cookies.clear())
 
+// One signed-in member is reused by every scenario: each scenario resets disabled_at / session_revoked_at and restores the cookies of the single
+// sign-in. Signing in per scenario (about 50 calls from one IP) exceeds the Supabase Auth sign-in rate limit.
+let shared: { user: TestUser; cookies: Map<string, string> } | null = null
+async function sharedMember(): Promise<TestUser> {
+  if (!shared) {
+    const user = await createTestUser('user')
+    await signIn(user)
+    shared = { user, cookies: new Map(jar.cookies) }
+  }
+  await resetUserState(shared.user.id)
+  jar.cookies.clear()
+  for (const [k, v] of shared.cookies) jar.cookies.set(k, v)
+  return shared.user
+}
+
 describe.skipIf(!dbUp)('authorization matrix over every user / admin action (07 13.3)', () => {
   it('every guarded action has a valid input in tests/fixtures/az-inputs.ts', () => {
     expect(guarded.filter((a) => !(a.name in AZ_INPUTS)).map((a) => a.name)).toEqual([])
@@ -63,14 +79,12 @@ describe.skipIf(!dbUp)('authorization matrix over every user / admin action (07 
       expect(await a.run(AZ_INPUTS[a.name])).toMatchObject({ ok: false, error: { code: 'UNAUTHENTICATED' } })
     })
     it(`AZ-05 ${a.name}: disabled user -> UNAUTHENTICATED`, async () => {
-      const u = await createTestUser('user')
-      await signIn(u)
+      const u = await sharedMember()
       await disableUser(u.id)
       expect(await a.run(AZ_INPUTS[a.name])).toMatchObject({ ok: false, error: { code: 'UNAUTHENTICATED' } })
     })
     it(`AZ-06 ${a.name}: session_revoked_at after the authentication time -> UNAUTHENTICATED`, async () => {
-      const u = await createTestUser('user')
-      await signIn(u)
+      const u = await sharedMember()
       await revokeSessions(u.id, new Date(Date.now() + 60_000))
       expect(await a.run(AZ_INPUTS[a.name])).toMatchObject({ ok: false, error: { code: 'UNAUTHENTICATED' } })
     })
@@ -78,8 +92,7 @@ describe.skipIf(!dbUp)('authorization matrix over every user / admin action (07 
 
   for (const a of adminOnly) {
     it(`AZ-02 ${a.name}: a member -> FORBIDDEN (the handler does not run)`, async () => {
-      const u = await createTestUser('user')
-      await signIn(u)
+      await sharedMember()
       expect(await a.run(AZ_INPUTS[a.name])).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
     })
   }
@@ -105,8 +118,7 @@ describe.skipIf(!dbUp)('files.* are in the matrix as admin-only (WP-4.7)', () =>
     })
   }
   it('AZ-02 files.startUpload called directly by a member is FORBIDDEN', async () => {
-    const u = await createTestUser('user')
-    await signIn(u)
+    await sharedMember()
     const a = adminOnly.find((x) => x.name === 'files.startUpload')
     expect(await a?.run(AZ_INPUTS['files.startUpload'])).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
   })

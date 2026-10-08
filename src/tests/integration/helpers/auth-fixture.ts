@@ -62,7 +62,12 @@ export async function signIn(user: TestUser): Promise<void> {
     },
   })
   const { error } = await supabase.auth.signInWithPassword({ email: user.email, password: user.password })
-  if (error) throw new Error(`signIn failed: ${error.name}`)
+  if (error) throw new Error(`signIn failed: ${error.name} status=${String(error.status)} code=${String(error.code)}`)
+}
+
+/** Clears disabled_at / session_revoked_at so that one signed-in user can be reused across scenarios (saves Auth sign-in calls: rate limit). */
+export async function resetUserState(id: string): Promise<void> {
+  await getDb().update(profiles).set({ disabledAt: null, sessionRevokedAt: null }).where(eq(profiles.id, id))
 }
 
 export async function disableUser(id: string): Promise<void> {

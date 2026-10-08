@@ -99,7 +99,8 @@ async function pendingRow(admin: TestUser, folderId: string, o: { size: number; 
     })
   if (o.body) {
     const { signedUrl } = await getObjects().createSignedUploadUrl(path)
-    expect(await put(signedUrl, { 'content-type': o.mime ?? 'text/html' }, o.body)).toBeLessThan(300)
+    const status = await put(signedUrl, { 'content-type': o.mime ?? 'text/html' }, o.body)
+    expect(status, `PUT status (mime ${o.mime ?? 'text/html'})`).toBeLessThan(300)
   }
   return id
 }
@@ -128,14 +129,20 @@ describe.skipIf(!dbUp)('uploads (WP-4.1)', () => {
     const folderId = await newFolder(admin)
     expect(await shapeOf(start(admin, folderId, 50 * MB + 1))).toMatchObject({ code: 'VALIDATION_FAILED' })
     expect(await shapeOf(start(admin, folderId, 10, undefined, { contentType: 'application/pdf' }))).toMatchObject({ code: 'VALIDATION_FAILED' })
-    const id = await pendingRow(admin, folderId, { size: 10, body: html(10), mime: 'text/plain' })
+    // The bucket (allowed_mime_types = text/html) already refuses other MIME types at the PUT (see upload-abnormal ST-1), so the
+    // verification layer is exercised with a text/html object whose head is binary (a NUL byte): UPLOAD_VERIFICATION_FAILED (07 9.3).
+    const binary = html(10)
+    binary[5] = 0
+    const id = await pendingRow(admin, folderId, { size: 10, body: binary })
     expect(await shapeOf(uploadsService.finalizeUpload(ctxOf(admin), { fileId: id }))).toMatchObject({ code: 'UPLOAD_VERIFICATION_FAILED' })
   })
 
   it('QT-09: two concurrent startUpload of 500 MB each (limit 900 MB): one succeeds, one is QUOTA_EXCEEDED', async () => {
     const admin = await createTestUser('admin')
     const folderId = await newFolder(admin)
-    const results = await Promise.allSettled([start(admin, folderId, 500 * MB), start(admin, folderId, 500 * MB)])
+    // The default per-file limit is 50 MB, so the limits are raised for this vector (07 6.3 QT-09: user limit 900 MB; total limit not binding).
+    const deps = depsWith({ maxFileBytes: 600 * MB, userLimitBytes: 900 * MB, totalLimitBytes: 10 ** 12 })
+    const results = await Promise.allSettled([start(admin, folderId, 500 * MB, deps), start(admin, folderId, 500 * MB, deps)])
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
     const failed = results.find((r) => r.status === 'rejected')
     expect(failed?.status === 'rejected' && failed.reason instanceof AppError && failed.reason.shape.code).toBe('QUOTA_EXCEEDED')

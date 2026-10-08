@@ -10,7 +10,7 @@ vi.mock('next/headers', async () => (await import('./helpers/auth-fixture')).nex
 
 import { viewOpenAsMember, viewRequestMemberDownload } from '@/app/_actions/view'
 import { closeDb, getDb, pingDb } from '@/server/db/client'
-import { accessLogs, auditLogs, rateLimits } from '@/server/db/schema'
+import { accessLogs, auditLogs, files, rateLimits } from '@/server/db/schema'
 import { deleteRateLimitsByKeyPrefix, incrementRateLimit } from '@/server/repositories/rate-limits'
 import { rateLimitKey } from '@/server/security/rate-limit'
 import { cleanupTestUsers, createTestUser, jar, signIn } from './helpers/auth-fixture'
@@ -67,7 +67,7 @@ describe.skipIf(!dbUp)('ticket:user rate limit (07 5.2 RL-30)', () => {
 
     for (let i = 1; i <= 30; i++) {
       const r = await viewOpenAsMember({ fileId })
-      expect(r.ok, `call ${i}`).toBe(true)
+      expect(r.ok, `call ${i}: ${r.ok ? 'ok' : r.error.code}`).toBe(true)
     }
     expect(await logCount()).toBe(30)
     expect(await auditCount()).toBe(0)
@@ -102,6 +102,8 @@ describe.skipIf(!dbUp)('download:user rate limit (07 5.2 RL-33)', () => {
     await addMemberRow(folderId, member.id, admin.id)
     const fileId = await createFileRow(folderId, admin.id)
     fileIds.push(fileId)
+    // files.download_allowed defaults to false (05): without this the first call is ACCESS_DENIED (DOWNLOAD_NOT_ALLOWED).
+    await getDb().update(files).set({ downloadAllowed: true }).where(eq(files.id, fileId))
     const downloadKey = rateLimitKey('download:user', { userId: member.id })
     const ticketKey = rateLimitKey('ticket:user', { userId: member.id })
     counterPrefixes.push(downloadKey, ticketKey, rateLimitKey('mutation:user', { userId: member.id }))
@@ -119,7 +121,7 @@ describe.skipIf(!dbUp)('download:user rate limit (07 5.2 RL-33)', () => {
 
     for (let i = 1; i <= 20; i++) {
       const r = await viewRequestMemberDownload({ fileId })
-      expect(r.ok, `call ${i}`).toBe(true)
+      expect(r.ok, `call ${i}: ${r.ok ? 'ok' : r.error.code}`).toBe(true)
     }
     expect(await logCount()).toBe(20)
     expect(await auditRows()).toHaveLength(0)
