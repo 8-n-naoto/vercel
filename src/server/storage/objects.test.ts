@@ -56,7 +56,7 @@ describe('readHead', () => {
     const f = vi.fn<typeof fetch>(async () => new Response(new Uint8Array(4).fill(1), { status: 206 }))
     const out = await adapter(bucket(), f).readHead('p', 4)
     expect(out).toHaveLength(4)
-    expect(f).toHaveBeenCalledWith(SECRET_URL, { headers: { Range: 'bytes=0-3' } })
+    expect(f).toHaveBeenCalledWith(SECRET_URL, { headers: { Range: 'bytes=0-3' }, signal: expect.any(AbortSignal) })
   })
   it('truncates a 200 full response to `bytes` and cancels the rest', async () => {
     const cancel = vi.fn()
@@ -70,6 +70,45 @@ describe('readHead', () => {
     const out = await adapter(bucket(), f).readHead('p', 4)
     expect(out).toEqual(new Uint8Array([2, 2, 2, 2]))
     expect(cancel).toHaveBeenCalled()
+  })
+  it('F-014: returns exactly 4096 bytes of a larger body and aborts the request signal', async () => {
+    let signal: AbortSignal | undefined
+    let cancelled = false
+    const body = new ReadableStream<Uint8Array>({
+      pull(c) {
+        c.enqueue(new Uint8Array(1500).fill(9)) // endless source: reading it all would never finish
+      },
+      cancel() {
+        cancelled = true
+      },
+    })
+    const f = vi.fn<typeof fetch>(async (_u, init) => {
+      signal = init?.signal ?? undefined
+      return new Response(body, { status: 206 })
+    })
+    const out = await adapter(bucket(), f).readHead('p', 4096)
+    expect(out).toHaveLength(4096)
+    expect(out.every((b) => b === 9)).toBe(true)
+    expect(cancelled).toBe(true)
+    expect(signal?.aborted).toBe(true)
+  })
+  it('F-014: does not wait for a cancel() that never settles once the request is aborted', async () => {
+    // Models the Next.js patched fetch: cancel() on the wrapped body stays pending until the connection is torn down.
+    const ac = new AbortController()
+    let release: () => void = () => undefined
+    const hung = new Promise<void>((r) => (release = r))
+    const body = new ReadableStream<Uint8Array>({
+      pull(c) {
+        c.enqueue(new Uint8Array(5000).fill(1))
+      },
+      cancel: () => hung,
+    })
+    const f = vi.fn<typeof fetch>(async (_u, init) => {
+      init?.signal?.addEventListener('abort', () => release())
+      ac.signal.throwIfAborted()
+      return new Response(body, { status: 206 })
+    })
+    await expect(adapter(bucket(), f).readHead('p', 4096)).resolves.toHaveLength(4096)
   })
   it('returns less when the object is shorter', async () => {
     const f = vi.fn<typeof fetch>(async () => new Response(streamOf(2), { status: 200 }))

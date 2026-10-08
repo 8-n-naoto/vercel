@@ -60,8 +60,12 @@ async function fetchSafe(deps: ObjectsDeps, url: string, init: RequestInit | und
   }
 }
 
-/** Reads at most `bytes` bytes and cancels the rest (handles servers that ignore Range and answer 200 with the whole body). */
-async function readUpTo(body: ReadableStream<Uint8Array>, bytes: number): Promise<Uint8Array> {
+/**
+ * Reads at most `bytes` bytes and discards the rest (handles servers that ignore Range and answer 200 with the whole body).
+ * `abort` tears the connection down first: inside Next.js the patched fetch wraps the body, and awaiting `cancel()` alone
+ * never settles once more than the first chunk is pending (F-014).
+ */
+async function readUpTo(body: ReadableStream<Uint8Array>, bytes: number, abort: () => void): Promise<Uint8Array> {
   const reader = body.getReader()
   const out = new Uint8Array(bytes)
   let filled = 0
@@ -74,6 +78,7 @@ async function readUpTo(body: ReadableStream<Uint8Array>, bytes: number): Promis
       filled += take
     }
   } finally {
+    abort()
     await reader.cancel().catch(() => undefined)
   }
   return out.slice(0, filled)
@@ -140,12 +145,14 @@ export function createObjectsAdapter(deps: ObjectsDeps): ObjectsAdapter {
 
     async readHead(path, bytes) {
       const url = await signedUrl(deps.bucket(), path, 'readHead')
-      const res = await fetchSafe(deps, url, { headers: { Range: `bytes=0-${bytes - 1}` } }, 'readHead')
+      const ac = new AbortController()
+      const res = await fetchSafe(deps, url, { headers: { Range: `bytes=0-${bytes - 1}` }, signal: ac.signal }, 'readHead')
       if ((res.status !== 206 && res.status !== 200) || !res.body) {
+        ac.abort()
         await res.body?.cancel().catch(() => undefined)
         throw new ObjectsError('readHead')
       }
-      return readUpTo(res.body, bytes) // 206: small body; 200: first `bytes` bytes, rest cancelled
+      return readUpTo(res.body, bytes, () => ac.abort()) // 206: small body; 200: first `bytes` bytes, rest cancelled
     },
 
     async openStream(path) {

@@ -36,3 +36,24 @@ describe.skipIf(!enabled)('objects adapter against the dev bucket', () => {
     expect(await objects.remove(path)).toEqual({ removed: [path], failed: [] }) // missing path is success
   })
 })
+
+// F-014: readHead on objects larger than 4096 bytes hung inside the Next.js runtime (awaiting reader.cancel() on the patched
+// fetch body). This guards the adapter against the real Storage with a time limit; the Next-runtime part is covered by E2E S06-1.
+describe.skipIf(!enabled)('readHead on objects larger than the head (F-014)', () => {
+  it.each([8 * 1024, 1024 * 1024])('returns 4096 bytes of a %i byte object within 5 seconds', async (size) => {
+    const objects = getObjects()
+    const p = `spike/${randomUUID()}/big-${size}.html`
+    try {
+      const { signedUrl } = await objects.createSignedUploadUrl(p)
+      const put = await fetch(signedUrl, { method: 'PUT', headers: { 'content-type': 'text/html' }, body: '<!doctype html>' + 'y'.repeat(size - 15) })
+      expect(put.ok).toBe(true)
+      const t0 = Date.now()
+      const head = await objects.readHead(p, 4096)
+      expect(Date.now() - t0).toBeLessThan(5000)
+      expect(head).toHaveLength(4096)
+      expect(new TextDecoder().decode(head.slice(0, 15))).toBe('<!doctype html>')
+    } finally {
+      await objects.remove(p)
+    }
+  }, 20_000)
+})
