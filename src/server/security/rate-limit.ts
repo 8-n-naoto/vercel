@@ -17,6 +17,7 @@ export type RateLimitRuleName =
   | 'raw:ip'
   | 'mutation:user'
   | 'ticket:user'
+  | 'download:user'
 
 export interface RateLimitParts {
   email?: string
@@ -98,6 +99,7 @@ export function rateLimitKey(rule: RateLimitRuleName, parts: RateLimitParts): st
       return `${rule}:${parts.linkId ?? ''}:${ip}`
     case 'mutation:user':
     case 'ticket:user':
+    case 'download:user':
       return `${rule}:${parts.userId ?? ''}`
   }
 }

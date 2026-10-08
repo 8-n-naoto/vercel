@@ -10,8 +10,8 @@ vi.mock('@/server/services/rate-limit-store', () => ({ incrementRateLimit: vi.fn
 vi.mock('@/server/services/audit', () => ({ recordStandalone: vi.fn() }))
 
 describe('07 5.2 coverage', () => {
-  // RL-29 lives in src/app/_actions/view.test.ts; RL-08..11 and RL-30 are integration rows and are excluded by the helper.
-  itCoversSpec07('RL', [...DECIDE_CASES, ...KEY_CASES].map((c) => c.id).concat('RL-29'))
+  // RL-29 and RL-32 live in src/app/_actions/view.test.ts; RL-08..11, RL-30 and RL-33 are integration rows and are excluded by the helper.
+  itCoversSpec07('RL', [...DECIDE_CASES, ...KEY_CASES].map((c) => c.id).concat('RL-29', 'RL-32'))
 })
 
 describe('decideRateLimit (07 5.2)', () => {

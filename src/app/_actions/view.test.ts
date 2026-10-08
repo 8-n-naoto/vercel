@@ -1,4 +1,5 @@
 // RL-29 (07 5.2): view.openAsMember is limited by mutation:user and then ticket:user (30 per 60 s), Q-28 / D-022.
+// RL-32: view.requestMemberDownload is limited by mutation:user and then download:user (20 per 60 s), Q-33 / D-023.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as session from '@/server/authz/session'
 import * as rateLimit from '@/server/security/rate-limit'
@@ -55,10 +56,41 @@ describe('view.openAsMember rate limit (RL-29)', () => {
     expect(r31).toMatchObject({ ok: false, error: { code: 'RATE_LIMITED' } })
     expect(viewService.openAsMember).toHaveBeenCalledTimes(30)
   })
+})
 
-  it('view.requestMemberDownload is not covered by ticket:user yet (Q-33 pending)', async () => {
-    vi.mocked(rateLimit.consumeRateLimit).mockResolvedValue({ ok: true })
+describe('view.requestMemberDownload rate limit (RL-32)', () => {
+  it('evaluates mutation:user then download:user 20 / 60 s; the 21st call is RATE_LIMITED without running the handler', async () => {
+    const counts = new Map<string, number>()
+    vi.mocked(rateLimit.consumeRateLimit).mockImplementation(async (rule) => {
+      const n = (counts.get(rule.key) ?? 0) + 1
+      counts.set(rule.key, n)
+      return n <= rule.limit ? { ok: true } : { ok: false, retryAfterSec: 12 }
+    })
+    for (let i = 1; i <= 20; i++) {
+      const r = await viewRequestMemberDownload(input)
+      expect(r.ok, `call ${i}`).toBe(true)
+    }
+    expect(viewService.requestMemberDownload).toHaveBeenCalledTimes(20)
+    const first = vi.mocked(rateLimit.consumeRateLimit).mock.calls.slice(0, 2).map((c) => c[0])
+    expect(first.map((r) => r.name)).toEqual(['mutation:user', 'download:user'])
+    expect(first[1]).toMatchObject({ key: 'download:user:u1', limit: 20, windowSec: 60 })
+    expect(first[1]).not.toHaveProperty('auditAction')
+
+    const r21 = await viewRequestMemberDownload(input)
+    expect(r21).toMatchObject({ ok: false, error: { code: 'RATE_LIMITED' } })
+    if (!r21.ok) expect(r21.error.retryAfterSec).toBeGreaterThan(0)
+    expect(viewService.requestMemberDownload).toHaveBeenCalledTimes(20)
+  })
+
+  it('does not share a counter with ticket:user', async () => {
+    const counts = new Map<string, number>()
+    vi.mocked(rateLimit.consumeRateLimit).mockImplementation(async (rule) => {
+      counts.set(rule.key, (counts.get(rule.key) ?? 0) + 1)
+      return { ok: true }
+    })
+    await viewOpenAsMember(input)
     await viewRequestMemberDownload(input)
-    expect(vi.mocked(rateLimit.consumeRateLimit).mock.calls.map((c) => c[0].name)).toEqual(['mutation:user'])
+    expect(counts.get('ticket:user:u1')).toBe(1)
+    expect(counts.get('download:user:u1')).toBe(1)
   })
 })

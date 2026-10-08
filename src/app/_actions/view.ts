@@ -10,7 +10,7 @@ export const viewOpenAsMember = defineAction({
   name: 'view.openAsMember',
   auth: 'user',
   input: viewOpenAsMemberInput,
-  // Q-28 / D-022: ticket issuing is limited to 30 per 60 s per user (06 3.5). view.requestMemberDownload is not covered yet (Q-33).
+  // Q-28 / D-022: ticket issuing is limited to 30 per 60 s per user (06 3.5). view.requestMemberDownload has its own counter (download:user, Q-33 / D-023).
   rateLimit: [{ name: 'ticket:user', key: (ctx) => (ctx.actor ? rateLimitKey('ticket:user', { userId: ctx.actor.userId }) : null), limit: 30, windowSec: 60 }],
   handler: async (ctx, input): Promise<OpenAsMemberResult> => viewService.openAsMember(ctx, input),
 })
@@ -19,6 +19,7 @@ export const viewRequestMemberDownload = defineAction({
   name: 'view.requestMemberDownload',
   auth: 'user',
   input: viewRequestMemberDownloadInput,
-  rateLimit: [],
+  // Q-33 / D-023: download ticket issuing is limited to 20 per 60 s per user, a counter separate from ticket:user (06 3.5).
+  rateLimit: [{ name: 'download:user', key: (ctx) => (ctx.actor ? rateLimitKey('download:user', { userId: ctx.actor.userId }) : null), limit: 20, windowSec: 60 }],
   handler: async (ctx, input): Promise<{ downloadUrl: string; expiresAt: string }> => viewService.requestMemberDownload(ctx, input),
 })

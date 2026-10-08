@@ -1,4 +1,4 @@
-// 07 5.2 RL-30 (integration) and the D-021 IPv6 /64 behaviour against a real database. Skipped when the dev database is unreachable.
+// 07 5.2 RL-30 / RL-33 (integration) and the D-021 IPv6 /64 behaviour against a real database. Skipped when the dev database is unreachable.
 // NOT RUN yet (T-060): the dev DB was not reachable; test-runner runs it after the connection is restored (npm run test:integration).
 // Route (a): the real Action `viewOpenAsMember` is called, so defineAction's rate limit wrapper is exercised (next/headers is mocked by the jar).
 // Test fixture only: counters, access_logs and audit rows of throw-away users are removed afterwards.
@@ -8,9 +8,9 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('next/headers', async () => (await import('./helpers/auth-fixture')).nextHeadersMock)
 
-import { viewOpenAsMember } from '@/app/_actions/view'
+import { viewOpenAsMember, viewRequestMemberDownload } from '@/app/_actions/view'
 import { closeDb, getDb, pingDb } from '@/server/db/client'
-import { accessLogs, auditLogs } from '@/server/db/schema'
+import { accessLogs, auditLogs, rateLimits } from '@/server/db/schema'
 import { deleteRateLimitsByKeyPrefix, incrementRateLimit } from '@/server/repositories/rate-limits'
 import { rateLimitKey } from '@/server/security/rate-limit'
 import { cleanupTestUsers, createTestUser, jar, signIn } from './helpers/auth-fixture'
@@ -91,6 +91,57 @@ describe.skipIf(!dbUp)('ticket:user rate limit (07 5.2 RL-30)', () => {
     if (!r32.ok) expect(r32.error.code).toBe('RATE_LIMITED')
     expect(await logCount()).toBe(30)
     expect(await auditCount()).toBe(1) // only the first excess is audited
+  })
+})
+
+describe.skipIf(!dbUp)('download:user rate limit (07 5.2 RL-33)', () => {
+  it('RL-33 the 21st view.requestMemberDownload of one member is RATE_LIMITED: access_logs +20, one security.rate_limited audit (rule download:user), none more on the 22nd; ticket:user is not counted', async () => {
+    const admin = await createTestUser('admin')
+    const member = await createTestUser('user')
+    const folderId = await createFolderRow(admin.id)
+    await addMemberRow(folderId, member.id, admin.id)
+    const fileId = await createFileRow(folderId, admin.id)
+    fileIds.push(fileId)
+    const downloadKey = rateLimitKey('download:user', { userId: member.id })
+    const ticketKey = rateLimitKey('ticket:user', { userId: member.id })
+    counterPrefixes.push(downloadKey, ticketKey, rateLimitKey('mutation:user', { userId: member.id }))
+
+    await signIn(member)
+    useClientIp(uniqueIp())
+    const since = new Date(Date.now() - 1000)
+    const logCount = async () => (await getDb().select({ id: accessLogs.id }).from(accessLogs).where(eq(accessLogs.fileId, fileId))).length
+    const auditRows = async () =>
+      getDb()
+        .select({ metadata: auditLogs.metadata })
+        .from(auditLogs)
+        .where(and(eq(auditLogs.action, 'security.rate_limited'), eq(auditLogs.actorId, member.id), gte(auditLogs.occurredAt, since)))
+    const counterRows = async (key: string) => (await getDb().select({ count: rateLimits.count }).from(rateLimits).where(eq(rateLimits.key, key))).length
+
+    for (let i = 1; i <= 20; i++) {
+      const r = await viewRequestMemberDownload({ fileId })
+      expect(r.ok, `call ${i}`).toBe(true)
+    }
+    expect(await logCount()).toBe(20)
+    expect(await auditRows()).toHaveLength(0)
+
+    const r21 = await viewRequestMemberDownload({ fileId })
+    expect(r21.ok).toBe(false)
+    if (!r21.ok) {
+      expect(r21.error.code).toBe('RATE_LIMITED')
+      expect(r21.error.retryAfterSec).toBeGreaterThan(0)
+    }
+    expect(await logCount()).toBe(20)
+    const rows = await auditRows()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.metadata).toEqual({ rule: 'download:user' })
+
+    const r22 = await viewRequestMemberDownload({ fileId })
+    expect(r22.ok).toBe(false)
+    if (!r22.ok) expect(r22.error.code).toBe('RATE_LIMITED')
+    expect(await auditRows()).toHaveLength(1)
+
+    expect(await counterRows(ticketKey)).toBe(0) // separate counter: ticket:user was never touched
+    expect(await counterRows(downloadKey)).toBeGreaterThan(0)
   })
 })
 

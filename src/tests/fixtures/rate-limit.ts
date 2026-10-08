@@ -34,6 +34,7 @@ export const KEY_CASES: { id: string; rule: RateLimitRuleName; parts: RateLimitP
   { id: 'RL-25a', rule: 'share:ip', parts: { ip: 'not-an-ip' }, expected: 'share:ip:unknown' },
   { id: 'RL-25b', rule: 'share:ip', parts: { ip: '2001:db8::g' }, expected: 'share:ip:unknown' },
   { id: 'RL-26', rule: 'ticket:user', parts: { userId: 'U' }, expected: 'ticket:user:U' },
+  { id: 'RL-31', rule: 'download:user', parts: { userId: 'U' }, expected: 'download:user:U' },
 ]
 
 // Additions outside 07 (T-018, F-003 proposal 8). X-marked IDs never collide with 07 IDs.
