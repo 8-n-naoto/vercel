@@ -7,6 +7,7 @@
 import { randomBytes } from 'node:crypto'
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import { SEED_USERS } from '../scripts/seed-lib'
+import { signIn as restoreSession } from './support/session'
 
 const RUN = process.env.E2E_DB === '1' && !!process.env.SEED_PASSWORD
 const SEED_PASSWORD = process.env.SEED_PASSWORD ?? ''
@@ -30,7 +31,10 @@ async function signIn(page: Page, email: string, password: string, next?: string
 }
 
 async function freshPage(browser: Browser): Promise<{ ctx: BrowserContext; page: Page }> {
-  const ctx = await browser.newContext()
+  // Each anonymous context gets its own documentation-range IPv6 address so that token:ip (10 / 15 min per address) is not used up by one run.
+  // The local server honours x-forwarded-for (on Vercel it is overwritten, so only the local run is affected).
+  const h = randomBytes(4).toString('hex')
+  const ctx = await browser.newContext({ extraHTTPHeaders: { 'x-forwarded-for': `2001:db8:${h.slice(0, 4)}:${h.slice(4)}::1` } })
   return { ctx, page: await ctx.newPage() }
 }
 
@@ -48,8 +52,9 @@ test.describe('Phase 2 flow (needs DB and seed)', () => {
   test.skip(!RUN, 'set E2E_DB=1 and SEED_PASSWORD (dev DB + npm run seed) to run')
   test.describe.configure({ mode: 'serial' })
 
+  // S01-1 login itself is exercised by e2e/auth.setup.ts (one login per role); here the saved session must land on /folders.
   test('S01-1 member signs in and lands on /folders with the display name in the header', async ({ page }) => {
-    await signIn(page, MEMBER.email, SEED_PASSWORD)
+    await restoreSession(page, MEMBER.email)
     await expect(page).toHaveURL(/\/folders$/)
     await expect(page.getByText(MEMBER.displayName).first()).toBeVisible()
   })
@@ -83,14 +88,14 @@ test.describe('Phase 2 flow (needs DB and seed)', () => {
   })
 
   test('S01-5 an already signed-in user opening /login is sent to /folders', async ({ page }) => {
-    await signIn(page, MEMBER.email, SEED_PASSWORD)
+    await restoreSession(page, MEMBER.email)
     await expect(page).toHaveURL(/\/folders$/)
     await page.goto('/login')
     await expect(page).toHaveURL(/\/folders$/)
   })
 
   test('phase 1 (5) the auth cookie is HttpOnly, SameSite=Lax, host-only (no Domain), Secure on https, and not readable from script', async ({ page, baseURL }) => {
-    await signIn(page, MEMBER.email, SEED_PASSWORD)
+    await restoreSession(page, MEMBER.email)
     await expect(page).toHaveURL(/\/folders$/)
     const cookies = (await page.context().cookies()).filter((c) => c.name.startsWith('sb-') && c.name.includes('auth-token'))
     expect(cookies.length).toBeGreaterThan(0)
@@ -122,7 +127,7 @@ test.describe('Phase 2 flow (needs DB and seed)', () => {
   })
 
   test('S10-1 / S02-1 / S02-4 / phase 1 (1) an invite URL registers once; the same URL is then invalid', async ({ page, browser }) => {
-    await signIn(page, ADMIN.email, SEED_PASSWORD)
+    await restoreSession(page, ADMIN.email)
     const email = emailOf(1)
     const url = await issueInvite(page, email)
     expect(url).toMatch(/\/invite\/[A-Za-z0-9_-]{43}$/)
@@ -150,7 +155,7 @@ test.describe('Phase 2 flow (needs DB and seed)', () => {
   })
 
   test('S02-3 a mismatching confirmation and an 11-character password are rejected without registering', async ({ page, browser }) => {
-    await signIn(page, ADMIN.email, SEED_PASSWORD)
+    await restoreSession(page, ADMIN.email)
     const url = await issueInvite(page, emailOf(2))
     const invitee = await freshPage(browser)
     await invitee.page.goto(url)
@@ -168,7 +173,7 @@ test.describe('Phase 2 flow (needs DB and seed)', () => {
   })
 
   test('S10-2 an already registered e-mail is refused and no URL is shown', async ({ page }) => {
-    await signIn(page, ADMIN.email, SEED_PASSWORD)
+    await restoreSession(page, ADMIN.email)
     await page.goto('/admin/invites')
     await page.getByLabel('メールアドレス').fill(MEMBER.email)
     await page.getByRole('button', { name: '招待 URL を発行' }).click()
@@ -177,7 +182,7 @@ test.describe('Phase 2 flow (needs DB and seed)', () => {
   })
 
   test('S10-3 / phase 1 (2) issuing twice revokes the first URL', async ({ page, browser }) => {
-    await signIn(page, ADMIN.email, SEED_PASSWORD)
+    await restoreSession(page, ADMIN.email)
     const email = emailOf(3)
     const first = await issueInvite(page, email)
     const second = await issueInvite(page, email)
@@ -193,7 +198,7 @@ test.describe('Phase 2 flow (needs DB and seed)', () => {
   })
 
   test('S10-4 / phase 1 (2) [取り消し] marks the invite revoked and its URL becomes invalid', async ({ page, browser }) => {
-    await signIn(page, ADMIN.email, SEED_PASSWORD)
+    await restoreSession(page, ADMIN.email)
     const email = emailOf(4)
     const url = await issueInvite(page, email)
     await page.reload()
@@ -208,14 +213,14 @@ test.describe('Phase 2 flow (needs DB and seed)', () => {
   })
 
   test('phase 1 (2) a member cannot open /admin/invites (404 screen, no invite form)', async ({ page }) => {
-    await signIn(page, MEMBER.email, SEED_PASSWORD)
+    await restoreSession(page, MEMBER.email)
     const res = await page.goto('/admin/invites')
     expect(res?.status()).toBe(404)
     await expect(page.getByRole('button', { name: '招待 URL を発行' })).toHaveCount(0)
   })
 
   test('S14-1 the display name can be changed and is shown in the header; restored afterwards', async ({ page }) => {
-    await signIn(page, MEMBER.email, SEED_PASSWORD)
+    await restoreSession(page, MEMBER.email)
     await page.goto('/account')
     const renamed = `${MEMBER.displayName} ${runId}`
     await page.getByLabel('表示名').fill(renamed)
@@ -228,13 +233,13 @@ test.describe('Phase 2 flow (needs DB and seed)', () => {
   })
 
   test('S14-2 / S14-4 a wrong current password and an unchanged password are refused under the field', async ({ page }) => {
-    await signIn(page, MEMBER.email, SEED_PASSWORD)
+    await restoreSession(page, MEMBER.email)
     await page.goto('/account')
     await page.getByLabel('現在のパスワード', { exact: true }).fill('definitely-wrong-password')
     await page.getByLabel('新しいパスワード', { exact: true }).fill(`${runId}-new-Passw0rd`)
     await page.getByLabel('新しいパスワード（確認）', { exact: true }).fill(`${runId}-new-Passw0rd`)
     await page.getByRole('button', { name: 'パスワードを変更' }).click()
-    await expect(page.getByText('現在のパスワードが違います')).toBeVisible()
+    await expect(page.locator('#currentPassword-error')).toHaveText('現在のパスワードが違います')
     await page.getByLabel('現在のパスワード', { exact: true }).fill(SEED_PASSWORD)
     await page.getByLabel('新しいパスワード', { exact: true }).fill(SEED_PASSWORD)
     await page.getByLabel('新しいパスワード（確認）', { exact: true }).fill(SEED_PASSWORD)
@@ -249,6 +254,7 @@ test.describe('Phase 2 flow (needs DB and seed)', () => {
     await expect(other.page).toHaveURL(/\/folders$/)
 
     await signIn(page, invitee1.email, invitee1.password)
+    await expect(page).toHaveURL(/\/folders$/)
     await page.goto('/account')
     const next = `${randomBytes(12).toString('base64url')}-Bb2`
     await page.getByLabel('現在のパスワード', { exact: true }).fill(invitee1.password)

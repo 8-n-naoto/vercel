@@ -5,11 +5,11 @@
 // run and record it in 10. S07-3 (share link revoke) is held until WP-6.3 (the share link table does not exist yet).
 // Residue: the tests create a folder named `e2e-<runId>-files`; the last test deletes it, but a failed run leaves it (see docs/runbook.md section 10).
 import { randomBytes } from 'node:crypto'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { SEED_USERS } from '../scripts/seed-lib'
+import { signIn } from './support/session'
 
 const RUN = process.env.E2E_DB === '1' && process.env.E2E_FILES === '1' && !!process.env.SEED_PASSWORD
-const SEED_PASSWORD = process.env.SEED_PASSWORD ?? ''
 const runId = randomBytes(4).toString('hex')
 const folderName = `e2e-${runId}-files`
 const fileTitle = `e2e-${runId}-doc`
@@ -20,14 +20,6 @@ if (!ADMIN || !MEMBER) throw new Error('SEED_USERS must contain an admin and a m
 
 const UUID_A = '3f1c2b0e-6c2a-4f5e-9d3a-1b2c3d4e5f60'
 const UUID_B = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d'
-
-async function signIn(page: Page, email: string): Promise<void> {
-  await page.goto('/login')
-  await page.getByLabel('メールアドレス').fill(email)
-  await page.getByLabel('パスワード').fill(SEED_PASSWORD)
-  await page.getByRole('button', { name: 'ログイン' }).click()
-  await expect(page).toHaveURL(/\/folders$/)
-}
 
 /** About 1MB of UTF-8 HTML. */
 function oneMbHtml(): Buffer {
@@ -86,7 +78,7 @@ test.describe('files flow (needs DB, seed and WP-4.1 / WP-4.2)', () => {
     await page.goto(`${folderUrl}/upload`)
     await page.getByLabel('アップロードするファイル').setInputFiles({ name: 'fake.html', mimeType: 'text/html', buffer: PNG_BYTES })
     await page.getByRole('button', { name: 'アップロード', exact: true }).click()
-    await expect(page.getByRole('alert')).toContainText('テキスト（HTML）ではないファイルです')
+    await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toContainText('テキスト（HTML）ではないファイルです')
     await page.goto(folderUrl)
     await expect(page.getByText('fake')).toHaveCount(0)
   })
@@ -245,7 +237,7 @@ test.describe('files flow (needs DB, seed and WP-4.1 / WP-4.2)', () => {
     const utf16 = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('<p>utf16</p>', 'utf16le')])
     await page.getByLabel('アップロードするファイル').setInputFiles({ name: 'utf16.html', mimeType: 'text/html', buffer: utf16 })
     await page.getByRole('button', { name: 'アップロード', exact: true }).click()
-    await expect(page.getByRole('alert')).toContainText('テキスト（HTML）ではないファイルです')
+    await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toContainText('テキスト（HTML）ではないファイルです')
     await page.goto(folderUrl)
     await expect(page.getByText('utf16')).toHaveCount(0)
   })
@@ -267,7 +259,7 @@ test.describe('files flow (needs DB, seed and WP-4.1 / WP-4.2)', () => {
     await row.getByRole('button', { name: '削除' }).click()
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('textbox').fill(folderName)
-    await dialog.getByRole('button', { name: '削除', exact: true }).click()
+    await dialog.getByRole('button', { name: '削除する', exact: true }).click()
     await expect(page.getByRole('row', { name: new RegExp(folderName) })).toHaveCount(0)
   })
 })

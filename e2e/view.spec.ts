@@ -6,11 +6,11 @@
 // WP-5.6 additions: S08-2b (localStorage / fetch from the frame), S08-7 (no Cookie header on /raw requests), T2 (a removed member gets 404).
 // Residue: the tests create a folder named `e2e-<runId>-view`; the last test deletes it, but a failed run leaves it (see docs/runbook.md section 10).
 import { randomBytes } from 'node:crypto'
-import { expect, test, type Browser, type Page } from '@playwright/test'
+import { expect, test, type Browser } from '@playwright/test'
 import { SEED_USERS } from '../scripts/seed-lib'
+import { signIn } from './support/session'
 
 const RUN = process.env.E2E_DB === '1' && process.env.E2E_VIEW === '1' && !!process.env.SEED_PASSWORD
-const SEED_PASSWORD = process.env.SEED_PASSWORD ?? ''
 const runId = randomBytes(4).toString('hex')
 const folderName = `e2e-${runId}-view`
 const fileTitle = `e2e-${runId}-probe`
@@ -21,14 +21,6 @@ if (!ADMIN || !MEMBER) throw new Error('SEED_USERS must contain an admin and a m
 
 const UUID_A = '3f1c2b0e-6c2a-4f5e-9d3a-1b2c3d4e5f60'
 const V01 = 'このページの内容は利用者がアップロードしたものです。パスワードや個人情報を入力しないでください。'
-
-async function signIn(page: Page, email: string): Promise<void> {
-  await page.goto('/login')
-  await page.getByLabel('メールアドレス').fill(email)
-  await page.getByLabel('パスワード').fill(SEED_PASSWORD)
-  await page.getByRole('button', { name: 'ログイン' }).click()
-  await expect(page).toHaveURL(/\/folders$/)
-}
 
 test.describe('unauthenticated (no DB needed)', () => {
   test('/view/<uuid> -> /login?next=', async ({ page }) => {
@@ -150,7 +142,7 @@ test.describe('viewer flow (needs DB, seed, WP-5.1 and WP-5.2)', () => {
     await signIn(page, ADMIN.email)
     await page.goto(folderUrl)
     await page.getByRole('row', { name: new RegExp(fileTitle) }).getByRole('link', { name: '詳細' }).click()
-    await page.getByLabel('公開を停止する').uncheck()
+    await page.getByLabel('公開する', { exact: true }).check()
     await page.getByLabel('許可する').check()
     await page.getByRole('button', { name: '保存' }).last().click()
     await expect(page.getByText('保存しました')).toBeVisible()
@@ -213,7 +205,7 @@ test.describe('viewer flow (needs DB, seed, WP-5.1 and WP-5.2)', () => {
     await signIn(a, ADMIN.email)
     await a.goto(`${folderUrl}?tab=members`)
     await a.getByRole('row', { name: new RegExp(MEMBER.email) }).getByRole('button', { name: '外す' }).click()
-    await a.getByRole('dialog').getByRole('button', { name: '外す', exact: true }).click()
+    await a.getByRole('alertdialog').getByRole('button', { name: '外す', exact: true }).click()
     await expect(a.getByRole('row', { name: new RegExp(MEMBER.email) })).toHaveCount(0)
     await actx.close()
 
@@ -230,7 +222,7 @@ test.describe('viewer flow (needs DB, seed, WP-5.1 and WP-5.2)', () => {
     await row.getByRole('button', { name: '削除' }).click()
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('textbox').fill(folderName)
-    await dialog.getByRole('button', { name: '削除', exact: true }).click()
+    await dialog.getByRole('button', { name: '削除する', exact: true }).click()
     await expect(page.getByRole('row', { name: new RegExp(folderName) })).toHaveCount(0)
   })
 })

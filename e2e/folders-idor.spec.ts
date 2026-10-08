@@ -5,27 +5,21 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
 import { SEED_USERS } from '../scripts/seed-lib'
+import { signIn } from './support/session'
 
 const RUN = process.env.E2E_DB === '1' && process.env.E2E_FOLDERS === '1' && !!process.env.SEED_PASSWORD
-const SEED_PASSWORD = process.env.SEED_PASSWORD ?? ''
 const folderName = `e2e-${randomBytes(4).toString('hex')}-idor`
 
 const ADMIN = SEED_USERS.find((u) => u.role === 'admin')
 const MEMBER = SEED_USERS.find((u) => u.role === 'user' && u.member)
 if (!ADMIN || !MEMBER) throw new Error('SEED_USERS must contain an admin and a member')
 
-async function signIn(page: Page, email: string): Promise<void> {
-  await page.goto('/login')
-  await page.getByLabel('メールアドレス').fill(email)
-  await page.getByLabel('パスワード').fill(SEED_PASSWORD)
-  await page.getByRole('button', { name: 'ログイン' }).click()
-  await expect(page).toHaveURL(/\/folders$/)
-}
-
 /** The text of the page body, which must not depend on why the page is a 404. */
 async function notFoundBody(page: Page, path: string): Promise<string> {
   const r = await page.goto(path)
   expect(r?.status(), path).toBe(404)
+  // The 404 body can still be streaming right after load, so wait until it has text.
+  await expect(page.locator('body')).not.toHaveText('')
   return (await page.locator('body').innerText()).trim()
 }
 
@@ -59,11 +53,14 @@ test.describe('folder IDOR and member removal (needs DB, seed and WP-3.3)', () =
     await signIn(admin, ADMIN.email)
     await admin.goto(`${folderUrl}?tab=members`)
     await admin.getByRole('row', { name: new RegExp(MEMBER.email) }).getByRole('button', { name: '外す' }).click()
-    await admin.getByRole('dialog').getByRole('button', { name: '外す', exact: true }).click()
-    await expect(admin.getByRole('cell', { name: MEMBER.email })).toHaveCount(0)
+    await admin.getByRole('alertdialog').getByRole('button', { name: '外す', exact: true }).click()
+    await expect(admin.getByRole('row', { name: new RegExp(MEMBER.email) })).toHaveCount(0)
 
-    await member.goto('/folders')
-    await expect(member.getByRole('link', { name: folderName })).toHaveCount(0)
+    // The row detaches optimistically; the server commit lands shortly after, so poll with reloads.
+    await expect(async () => {
+      await member.goto('/folders')
+      await expect(member.getByRole('link', { name: folderName })).toHaveCount(0, { timeout: 1000 })
+    }).toPass({ timeout: 15000 })
     expect((await member.goto(folderUrl))?.status()).toBe(404)
     await admin.close()
     await member.close()
@@ -91,7 +88,7 @@ test.describe('folder IDOR and member removal (needs DB, seed and WP-3.3)', () =
     await page.getByRole('row', { name: new RegExp(folderName) }).getByRole('button', { name: '削除' }).click()
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('textbox').fill(folderName)
-    await dialog.getByRole('button', { name: '削除', exact: true }).click()
+    await dialog.getByRole('button', { name: '削除する', exact: true }).click()
     await expect(page.getByRole('status')).toContainText('フォルダを削除しました')
     expect((await page.goto(folderUrl))?.status()).toBe(404)
   })

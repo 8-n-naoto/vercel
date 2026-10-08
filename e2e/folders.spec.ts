@@ -4,25 +4,17 @@
 // NOT RUN in WP-3.4 (no DB connection). Selectors follow the components; adjust on the first real run and record it in 10.
 // Residue: the tests create folders named `e2e-<runId>-*`; the tests delete them, but a failed run leaves them (see docs/runbook.md section 10).
 import { randomBytes } from 'node:crypto'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { SEED_USERS } from '../scripts/seed-lib'
+import { signIn } from './support/session'
 
 const RUN = process.env.E2E_DB === '1' && process.env.E2E_FOLDERS === '1' && !!process.env.SEED_PASSWORD
-const SEED_PASSWORD = process.env.SEED_PASSWORD ?? ''
 const runId = randomBytes(4).toString('hex')
 const folderName = `e2e-${runId}-a`
 
 const ADMIN = SEED_USERS.find((u) => u.role === 'admin')
 const MEMBER = SEED_USERS.find((u) => u.role === 'user' && u.member)
 if (!ADMIN || !MEMBER) throw new Error('SEED_USERS must contain an admin and a member')
-
-async function signIn(page: Page, email: string): Promise<void> {
-  await page.goto('/login')
-  await page.getByLabel('メールアドレス').fill(email)
-  await page.getByLabel('パスワード').fill(SEED_PASSWORD)
-  await page.getByRole('button', { name: 'ログイン' }).click()
-  await expect(page).toHaveURL(/\/folders$/)
-}
 
 test.describe('unauthenticated (no DB needed)', () => {
   for (const path of ['/folders', '/folders/3f1c2b0e-6c2a-4f5e-9d3a-1b2c3d4e5f60', '/admin/folders']) {
@@ -70,9 +62,10 @@ test.describe('folders flow (needs DB, seed and WP-3.3)', () => {
     await page.getByRole('link', { name: folderName }).click()
     await expect(page.getByRole('link', { name: '閲覧ログ' })).toHaveCount(0)
     await expect(page.getByRole('link', { name: '設定', exact: true })).toHaveCount(0)
+    await expect(page).toHaveURL(/\/folders\/[0-9a-f-]{36}$/)
     const url = page.url()
     await page.goto(`${url}?tab=settings`)
-    await expect(page.getByRole('link', { name: 'ファイル' })).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByRole('link', { name: 'ファイル', exact: true })).toHaveAttribute('aria-current', 'page')
     await page.goto(`${url}?tab=members`)
     await expect(page.getByText(MEMBER.email)).toHaveCount(0)
   })
@@ -113,9 +106,9 @@ test.describe('folders flow (needs DB, seed and WP-3.3)', () => {
     const row = page.getByRole('row', { name: new RegExp(folderName) })
     await row.getByRole('button', { name: '削除' }).click()
     const dialog = page.getByRole('dialog')
-    await expect(dialog.getByRole('button', { name: '削除', exact: true })).toBeDisabled()
+    await expect(dialog.getByRole('button', { name: '削除する', exact: true })).toBeDisabled()
     await dialog.getByRole('textbox').fill(folderName)
-    await dialog.getByRole('button', { name: '削除', exact: true }).click()
+    await dialog.getByRole('button', { name: '削除する', exact: true }).click()
     await expect(page.getByRole('status')).toContainText('フォルダを削除しました')
     await expect(page.getByRole('row', { name: new RegExp(folderName) })).toHaveCount(0)
   })
